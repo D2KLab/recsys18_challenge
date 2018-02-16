@@ -36,7 +36,7 @@ function parseFile(file) {
 function writePlaylistsCsv(playlists) {
   var pl_file = path.join(output_dir, 'playlists.csv');
   // console.log('writing', pl_file);
-  var header = Playlist.allProperties.join(',') + '\n';
+  var header = Playlist.allProperties.join(';') + '\n';
   var pl_string = playlists
     .map(p => p.toCSV())
     .join('\n');
@@ -49,7 +49,7 @@ function writeTracksCsv(playlists) {
 
   var tr_file = path.join(output_dir, 'tracks.csv');
   // console.log('writing', tr_file);
-  var header = Track.allProperties.join(',') + '\n';
+  var header = Track.allProperties.join(';') + '\n';
   var tr_string = tracks
     .map(t => t.toCSV())
     .join('\n');
@@ -62,7 +62,7 @@ function writeSequentialCsv(playlists) {
     let file = path.join(output_dir, `${what}_seq.csv`);
     // console.log('writing', file);
     var content = playlists.map(p =>
-      p.getTracksProp(what).join(','));
+      p.getTracksProp(what).join(';'));
     writeToFile(file, content.join('\n'));
   }
 }

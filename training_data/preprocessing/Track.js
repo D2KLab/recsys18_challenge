@@ -19,7 +19,7 @@ class Track {
   toCSV() {
     return properties
       .map(p => this.hasOwnProperty(p) ? this[p] : '')
-      .join(',')
+      .join(';')
       .replace(/"/g, '""');
   }
 

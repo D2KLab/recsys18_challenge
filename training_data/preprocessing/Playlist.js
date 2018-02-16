@@ -19,7 +19,7 @@ class Playlist {
     return properties
       .filter(noTracks)
       .map(p => this.hasOwnProperty(p) ? this[p] : '')
-      .join(',')
+      .join(';')
       .replace(/"/g, '""');
   }
 
