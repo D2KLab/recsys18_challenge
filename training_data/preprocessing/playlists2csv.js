@@ -70,7 +70,7 @@ function writeSequentialCsv(playlists) {
 function writeToFile(file, content, header) {
   var writeHeader = !fs.existsSync(file) && header;
 
-  var stream = fs.openSync(file, 'w');
+  var stream = fs.openSync(file, 'a');
   if (writeHeader)
     fs.writeSync(stream, header, 'utf-8');
 
