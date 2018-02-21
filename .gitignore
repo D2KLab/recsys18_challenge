@@ -1,3 +1,7 @@
+# training data
+training_data/
+
+
 # Logs
 logs
 *.log
