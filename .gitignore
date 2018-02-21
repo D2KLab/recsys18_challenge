@@ -1,6 +1,7 @@
 # training data
 training_data/
 models/
+*.out
 
 # Logs
 logs
