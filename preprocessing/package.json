@@ -13,6 +13,11 @@
   },
   "dependencies": {
     "async": "^2.6.0",
-    "fs-extra": "^5.0.0"
+    "fs-extra": "^5.0.0",
+    "json2csv": "^4.0.0-alpha.0",
+    "request": "^2.83.0",
+    "request-promise": "^4.2.2",
+    "sparql-transformer": "^1.2.0",
+    "wikidata-sdk": "^5.8.1"
   }
 }
