@@ -62,3 +62,8 @@ typings/
 # dotenv environment variables file
 .env
 
+# Python venv
+venv/
+
+# Intellij IDE
+.idea/
