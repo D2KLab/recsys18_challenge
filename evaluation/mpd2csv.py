@@ -6,13 +6,16 @@ from os.path import join
 
 parser = argparse.ArgumentParser(description="Convert MPD")
 
-parser.add_argument('--path', default=None, required=True)
+parser.add_argument('--mpd_path', default=None, required=True)
+parser.add_argument('--out_path', default=None, required=True)
+
 args = parser.parse_args()
 
-mpd_path = args.path
+mpd_path = args.mpd_path
+out_path = args.out_path
 
-playlists_file = open('playlists_mpd.csv', 'w', newline='', encoding='utf8')
-items_file = open('items_mpd.csv', 'w', newline='', encoding='utf8')
+playlists_file = open(join(out_path, 'playlists_mpd.csv'), 'w', newline='', encoding='utf8')
+items_file = open(join(out_path, 'items_mpd.csv'), 'w', newline='', encoding='utf8')
 
 playlists_writer = csv.writer(playlists_file)
 items_writer = csv.writer(items_file)

@@ -9,12 +9,14 @@ random.seed(1)
 
 parser = argparse.ArgumentParser(description="Split MPD")
 
-parser.add_argument('--path', default=None, required=True)
+parser.add_argument('--mpd_path', default=None, required=True)
+parser.add_argument('--out_path', default=None, required=True)
 parser.add_argument('--scale', type=int, required=True)
 
 args = parser.parse_args()
 
-mpd_path = args.path
+mpd_path = args.mpd_path
+out_path = args.out_path
 scale = args.scale
 validation_size = 10 * scale
 
@@ -23,7 +25,7 @@ pid_slices = {}
 slices = []
 
 print("Counting the number of entries per track")
-with open('tracks_mpd.csv', 'w', newline='', encoding='utf8') as tracks_file:
+with open(join(out_path, 'tracks_mpd.csv'), 'w', newline='', encoding='utf8') as tracks_file:
     writer = csv.writer(tracks_file)
     for mpd_slice in listdir(mpd_path):
         with open(join(mpd_path, mpd_slice), encoding='utf8') as json_file:
@@ -48,7 +50,7 @@ with open('tracks_mpd.csv', 'w', newline='', encoding='utf8') as tracks_file:
                                          track['duration_ms']])
 
 # Saving the count of the entries
-with open('tracks_mpd_count.csv', 'w', newline='', encoding='utf8') as count_file:
+with open(join(out_path, 'tracks_mpd_count.csv'), 'w', newline='', encoding='utf8') as count_file:
     writer = csv.writer(count_file)
     for track_uri, count in tracks_count.items():
         writer.writerow([track_uri, count])
@@ -143,16 +145,16 @@ for candidate_pid in candidate_pid_list:
             break
 
 # Saving the results
-with open('pid_validation.csv', 'w', newline='', encoding='utf8') as pid_validation_file:
+with open(join(out_path, 'pid_validation.csv'), 'w', newline='', encoding='utf8') as pid_validation_file:
     pid_validation_writer = csv.writer(pid_validation_file)
     for pid in validation_playlists:
         pid_validation_writer.writerow([pid])
 
-playlists_training_file = open('playlists_training.csv', 'w', newline='', encoding='utf8')
-items_training_file = open('items_training.csv', 'w', newline='', encoding='utf8')
-playlists_validation_file = open('playlists_validation.csv', 'w', newline='', encoding='utf8')
-items_validation_file = open('items_validation.csv', 'w', newline='', encoding='utf8')
-items_validation_hidden_file = open('items_validation_hidden.csv', 'w', newline='', encoding='utf8')
+playlists_training_file = open(join(out_path, 'playlists_training.csv'), 'w', newline='', encoding='utf8')
+items_training_file = open(join(out_path, 'items_training.csv'), 'w', newline='', encoding='utf8')
+playlists_validation_file = open(join(out_path, 'playlists_validation.csv'), 'w', newline='', encoding='utf8')
+items_validation_file = open(join(out_path, 'items_validation.csv'), 'w', newline='', encoding='utf8')
+items_validation_hidden_file = open(join(out_path, 'items_validation_hidden.csv'), 'w', newline='', encoding='utf8')
 
 playlists_training_writer = csv.writer(playlists_training_file)
 items_training_writer = csv.writer(items_training_file)
