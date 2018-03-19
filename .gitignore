@@ -1,6 +1,8 @@
-# training data
-training_data/
+# Training data
+dataset/
 models/
+submissions/
+training_data/
 *.out
 
 # Logs

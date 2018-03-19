@@ -3,9 +3,9 @@ import csv
 
 parser = argparse.ArgumentParser(description="Most Popular")
 
-parser.add_argument('--items_training', default=None, required=True)
-parser.add_argument('--playlists_test', default=None, required=True)
-parser.add_argument('--items_test', default=None, required=True)
+parser.add_argument('--items_training', default='dataset/items_training.csv', required=False)
+parser.add_argument('--playlists_test', default='dataset/playlists_validation.csv', required=False)
+parser.add_argument('--items_test', default='dataset/items_validation.csv', required=False)
 parser.add_argument('--items_submission', default=None, required=True)
 
 args = parser.parse_args()
