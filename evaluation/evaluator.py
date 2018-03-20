@@ -236,3 +236,33 @@ for i, pid in enumerate(pids):
 
 print('\nNDCG per artist', ndcg_artists.mean())
 print_evaluation(ndcg_artists)
+
+# Clicks per track
+clicks_tracks = np.full(len(pids), 51)
+
+for i, pid in enumerate(pids):
+    g_tracks = items_hidden[pid]
+    r_tracks = submission[pid]
+
+    for index, track_uri in enumerate(r_tracks):
+        if track_uri in g_tracks:
+            clicks_tracks[i] = math.floor(index / 10)
+            break
+
+print('\nClicks per track', clicks_tracks.mean())
+print_evaluation(clicks_tracks)
+
+# Clicks per artist
+clicks_artists = np.full(len(pids), 51)
+
+for i, pid in enumerate(pids):
+    g_artists = track2artist(items_hidden[pid])
+    r_artists = track2artist(submission[pid])
+
+    for index, artist_uri in enumerate(r_artists):
+        if artist_uri in g_artists:
+            clicks_artists[i] = math.floor(index / 10)
+            break
+
+print('\nClicks per artist', clicks_artists.mean())
+print_evaluation(clicks_artists)
