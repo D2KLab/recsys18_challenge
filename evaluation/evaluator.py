@@ -1,5 +1,6 @@
 import argparse
 import csv
+import math
 import numpy as np
 
 
@@ -147,8 +148,7 @@ for row in items_validation_hidden_reader:
 # Precision per track
 precision_tracks = np.full(len(pids), 0.0)
 
-for i in range(len(pids)):
-    pid = pids[i]
+for i, pid in enumerate(pids):
     g_tracks = items_hidden[pid]
     g_tracks_size = len(g_tracks)
     r_tracks = submission[pid][:g_tracks_size]
@@ -165,14 +165,13 @@ print_evaluation(precision_tracks)
 # Precision per artist
 precision_artists = np.full(len(pids), 0.0)
 
-for i in range(len(pids)):
-    pid = pids[i]
+for i, pid in enumerate(pids):
     g_artists = track2artist(items_hidden[pid])
     g_artists_size = len(g_artists)
     r_artists = track2artist(submission[pid][:g_artists_size])
 
-    for track_uri in r_artists:
-        if track_uri in g_artists:
+    for artist_uri in r_artists:
+        if artist_uri in g_artists:
             precision_artists[i] += 1
 
     precision_artists[i] /= g_artists_size
@@ -180,4 +179,60 @@ for i in range(len(pids)):
 print('\nPrecision per artist', precision_artists.mean())
 print_evaluation(precision_artists)
 
-# TODO NDCG and Click metrics
+# NDCG per track
+ndcg_tracks = np.full(len(pids), 0.0)
+
+for i, pid in enumerate(pids):
+    g_tracks = items_hidden[pid]
+    r_tracks = submission[pid]
+
+    # DCG
+    for index, track_uri in enumerate(r_tracks):
+        if track_uri in g_tracks:
+            if index != 0:
+                ndcg_tracks[i] += 1 / math.log2(index + 1)
+            else:
+                ndcg_tracks[i] += 1
+
+    # IDCG
+    idcg = 1.0
+    for track_uri in r_tracks:
+        index = 2
+        if track_uri in g_tracks:
+            idcg += 1 / math.log2(index)
+            index += 1
+
+    # NDCG
+    ndcg_tracks[i] /= idcg
+
+print('\nNDCG per track', ndcg_tracks.mean())
+print_evaluation(ndcg_tracks)
+
+# NDCG per artist
+ndcg_artists = np.full(len(pids), 0.0)
+
+for i, pid in enumerate(pids):
+    g_artists = track2artist(items_hidden[pid])
+    r_artists = track2artist(submission[pid])
+
+    # DCG
+    for index, artist_uri in enumerate(r_artists):
+        if artist_uri in g_artists:
+            if index != 0:
+                ndcg_artists[i] += 1 / math.log2(index + 1)
+            else:
+                ndcg_artists[i] += 1
+
+    # IDCG
+    idcg = 1.0
+    for artist_uri in r_artists:
+        index = 2
+        if artist_uri in g_artists:
+            idcg += 1 / math.log2(index)
+            index += 1
+
+    # NDCG
+    ndcg_artists[i] /= idcg
+
+print('\nNDCG per artist', ndcg_artists.mean())
+print_evaluation(ndcg_artists)
