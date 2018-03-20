@@ -14,7 +14,7 @@ def print_evaluation(metric):
     print('\t', 'Title and first twenty-five', metric[6000:7000].mean())
     print('\t', 'Title and random twenty-five', metric[7000:8000].mean())
     print('\t', 'Title and first a hundred', metric[8000:9000].mean())
-    print('\t', 'Title and random a hundred', metric[9000:10000].mean())
+    print('\t', 'Title and random a hundred', metric[9000:10000].mean(), '\n')
 
 
 def track2artist(tracks_local):
@@ -31,10 +31,11 @@ parser.add_argument('--pid_validation', default='dataset/pid_validation.csv', re
 parser.add_argument('--items_validation', default='dataset/items_validation.csv', required=False)
 parser.add_argument('--items_validation_hidden', default='dataset/items_validation_hidden.csv', required=False)
 parser.add_argument('--items_submission', default=None, required=True)
+parser.add_argument('--verbose', action='store_true')
 
 args = parser.parse_args()
 
-print('Evaluating the submission file ' + args.items_submission)
+print('Evaluating the submission file ' + args.items_submission + '\n')
 
 tracks_mpd_file = open(args.tracks_mpd, 'r', newline='', encoding='utf8')
 pid_validation_file = open(args.pid_validation, 'r', newline='', encoding='utf8')
@@ -159,8 +160,9 @@ for i, pid in enumerate(pids):
 
     precision_tracks[i] /= g_tracks_size
 
-print('\nPrecision per track', precision_tracks.mean())
-print_evaluation(precision_tracks)
+print('Precision per track', precision_tracks.mean())
+if args.verbose is True:
+    print_evaluation(precision_tracks)
 
 # Precision per artist
 precision_artists = np.full(len(pids), 0.0)
@@ -176,8 +178,9 @@ for i, pid in enumerate(pids):
 
     precision_artists[i] /= g_artists_size
 
-print('\nPrecision per artist', precision_artists.mean())
-print_evaluation(precision_artists)
+print('Precision per artist', precision_artists.mean())
+if args.verbose is True:
+    print_evaluation(precision_artists)
 
 # NDCG per track
 ndcg_tracks = np.full(len(pids), 0.0)
@@ -205,8 +208,9 @@ for i, pid in enumerate(pids):
     # NDCG
     ndcg_tracks[i] /= idcg
 
-print('\nNDCG per track', ndcg_tracks.mean())
-print_evaluation(ndcg_tracks)
+print('NDCG per track', ndcg_tracks.mean())
+if args.verbose is True:
+    print_evaluation(ndcg_tracks)
 
 # NDCG per artist
 ndcg_artists = np.full(len(pids), 0.0)
@@ -234,8 +238,9 @@ for i, pid in enumerate(pids):
     # NDCG
     ndcg_artists[i] /= idcg
 
-print('\nNDCG per artist', ndcg_artists.mean())
-print_evaluation(ndcg_artists)
+print('NDCG per artist', ndcg_artists.mean())
+if args.verbose is True:
+    print_evaluation(ndcg_artists)
 
 # Clicks per track
 clicks_tracks = np.full(len(pids), 51)
@@ -249,8 +254,9 @@ for i, pid in enumerate(pids):
             clicks_tracks[i] = math.floor(index / 10)
             break
 
-print('\nClicks per track', clicks_tracks.mean())
-print_evaluation(clicks_tracks)
+print('Clicks per track', clicks_tracks.mean())
+if args.verbose is True:
+    print_evaluation(clicks_tracks)
 
 # Clicks per artist
 clicks_artists = np.full(len(pids), 51)
@@ -264,5 +270,6 @@ for i, pid in enumerate(pids):
             clicks_artists[i] = math.floor(index / 10)
             break
 
-print('\nClicks per artist', clicks_artists.mean())
-print_evaluation(clicks_artists)
+print('Clicks per artist', clicks_artists.mean())
+if args.verbose is True:
+    print_evaluation(clicks_artists)
