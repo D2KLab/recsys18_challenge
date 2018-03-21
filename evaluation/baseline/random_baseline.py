@@ -1,12 +1,14 @@
 import argparse
 import csv
+import random
 
-parser = argparse.ArgumentParser(description="Most Popular")
+parser = argparse.ArgumentParser(description="Random Recommender")
 
 parser.add_argument('--items_training', default='dataset/items_training.csv', required=False)
 parser.add_argument('--playlists_test', default='dataset/playlists_validation.csv', required=False)
 parser.add_argument('--items_test', default='dataset/items_validation.csv', required=False)
 parser.add_argument('--items_submission', default=None, required=True)
+parser.add_argument('--unigram', action='store_true')
 
 args = parser.parse_args()
 
@@ -20,17 +22,15 @@ playlists_test_reader = csv.reader(playlists_test_file)
 items_test_reader = csv.reader(items_test_file)
 items_submission_writer = csv.writer(items_submission_file)
 
-# Count the items
-items_count = {}
+# Load tracks from the training set
+tracks = []
 
 for row in items_training_reader:
     track_uri = row[2]
-    if track_uri in items_count:
-        items_count[track_uri] += 1
-    else:
-        items_count[track_uri] = 1
+    tracks.append(track_uri)
 
-items_sorted = sorted(items_count, key=items_count.get, reverse=True)
+if args.unigram is False:
+    tracks = list(set(tracks))
 
 # Load the test playlists
 playlists_test = []
@@ -52,16 +52,19 @@ for row in items_test_reader:
 # Create the submission
 for pid in playlists_test:
     row_submission = [pid]
-    if pid in items_test:
-        # Set difference
-        count = 0
-        for track_uri in items_sorted:
-            if track_uri not in items_test[pid]:
-                row_submission.append(track_uri)
-                count += 1
-            if count >= 500:
-                break
-    else:
-        row_submission += items_sorted[:500]
+
+    while len(row_submission) < 501:
+        # Random track_uri
+        track_uri = random.choice(tracks)
+        # Uniqueness of the submission
+        if track_uri in row_submission:
+            continue
+        # Avoid selecting seed tracks
+        try:
+            if track_uri in items_test[pid]:
+                continue
+        except KeyError:
+            pass
+        row_submission.append(track_uri)
 
     items_submission_writer.writerow(row_submission)
