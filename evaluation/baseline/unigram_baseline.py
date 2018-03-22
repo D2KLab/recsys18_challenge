@@ -1,5 +1,6 @@
 import argparse
 import csv
+import math
 import random
 
 parser = argparse.ArgumentParser(description="Random Recommender")
@@ -8,6 +9,7 @@ parser.add_argument('--items_training', default='dataset/items_training.csv', re
 parser.add_argument('--playlists_test', default='dataset/playlists_validation.csv', required=False)
 parser.add_argument('--items_test', default='dataset/items_validation.csv', required=False)
 parser.add_argument('--items_submission', default=None, required=True)
+parser.add_argument('--cutoff', type=float, default=1, required=False)
 
 args = parser.parse_args()
 
@@ -22,13 +24,26 @@ items_test_reader = csv.reader(items_test_file)
 items_submission_writer = csv.writer(items_submission_file)
 
 # Load tracks from the training set
-tracks = []
+tracks_all = []
+items_count = {}
 
 for row in items_training_reader:
     track_uri = row[2]
-    tracks.append(track_uri)
+    tracks_all.append(track_uri)
+    if track_uri in items_count:
+        items_count[track_uri] += 1
+    else:
+        items_count[track_uri] = 1
 
-tracks = list(set(tracks))
+items_sorted = sorted(items_count, key=items_count.get, reverse=True)
+index_cutoff = math.floor(len(items_sorted) * args.cutoff)
+tracks_cutoff = set(items_sorted[:index_cutoff])
+
+tracks = []
+
+for track_uri in tracks_all:
+    if track_uri in tracks_cutoff:
+        tracks.append(track_uri)
 
 # Load the test playlists
 playlists_test = []
