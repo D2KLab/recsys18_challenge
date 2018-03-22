@@ -3,7 +3,7 @@ import csv
 import math
 import random
 
-parser = argparse.ArgumentParser(description="Random Recommender")
+parser = argparse.ArgumentParser(description="Unigram Recommender")
 
 parser.add_argument('--items_training', default='dataset/items_training.csv', required=False)
 parser.add_argument('--playlists_test', default='dataset/playlists_validation.csv', required=False)
