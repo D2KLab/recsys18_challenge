@@ -1,0 +1,5 @@
+nltk
+sklearn
+numpy
+pandas
+matplotlib

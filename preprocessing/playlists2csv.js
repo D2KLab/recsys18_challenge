@@ -18,11 +18,23 @@ fs.readdir(input_dir)
     async.map(files, (file) => {
       let playlists = parseFile(file);
 
+      writeNamesCsv(playlists);
       writePlaylistsCsv(playlists);
       writeTracksCsv(playlists);
       writeSequentialCsv(playlists);
     }, () => console.log('done'));
   });
+
+function writeNamesCsv(playlists) {
+  var pl_file = path.join(output_dir, 'playlist_names.csv');
+  // console.log('writing', pl_file);
+  var header = 'pid;name;' + Array(10).fill(1).map((v, i) => 'track_' + i).join(';');
+  var pl_string = playlists
+    .map(p => [p.pid, p.name, ...p.tracks.map(t => t.track_name)].join(';'))
+    .join('\n');
+
+  writeToFile(pl_file, pl_string, header);
+}
 
 function parseFile(file) {
   console.log(file);
@@ -36,7 +48,7 @@ function parseFile(file) {
 function writePlaylistsCsv(playlists) {
   var pl_file = path.join(output_dir, 'playlists.csv');
   // console.log('writing', pl_file);
-  var header = Playlist.allProperties.join(';') + '\n';
+  var header = Playlist.allProperties.join(';');
   var pl_string = playlists
     .map(p => p.toCSV())
     .join('\n');
@@ -49,7 +61,7 @@ function writeTracksCsv(playlists) {
 
   var tr_file = path.join(output_dir, 'tracks.csv');
   // console.log('writing', tr_file);
-  var header = Track.allProperties.join(';') + '\n';
+  var header = Track.allProperties.join(';');
   var tr_string = tracks
     .map(t => t.toCSV())
     .join('\n');
@@ -74,7 +86,7 @@ function writeToFile(file, content, header) {
   if (writeHeader)
     fs.writeSync(stream, header, 'utf-8');
 
-  fs.writeSync(stream, content, 'utf-8');
+  fs.writeSync(stream, '\n' + content, 'utf-8');
 }
 
 const flatten = list => list.reduce(

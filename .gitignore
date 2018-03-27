@@ -1,5 +1,6 @@
 # Training data
 dataset/
+data/
 models/
 submissions/
 training_data/
@@ -69,3 +70,4 @@ venv/
 
 # Intellij IDE
 .idea/
+.ipynb_checkpoints/
