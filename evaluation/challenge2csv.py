@@ -1,11 +1,11 @@
 import argparse
 import csv
 import json
-from os.path import join
+from os import path
 
 parser = argparse.ArgumentParser(description="Convert challenge")
 
-parser.add_argument('--json_path', default=None, required=True)
+parser.add_argument('--challenge_path', default=None, required=True)
 parser.add_argument('--out_path', default=None, required=True)
 
 args = parser.parse_args()
@@ -13,8 +13,8 @@ args = parser.parse_args()
 json_path = args.json_path
 out_path = args.out_path
 
-playlists_file = open(join(out_path, 'playlists_challenge.csv'), 'w', newline='', encoding='utf8')
-items_file = open(join(out_path, 'items_challenge.csv'), 'w', newline='', encoding='utf8')
+playlists_file = open(path.join(out_path, 'playlists_challenge.csv'), 'w', newline='', encoding='utf8')
+items_file = open(path.join(out_path, 'items_challenge.csv'), 'w', newline='', encoding='utf8')
 
 playlists_writer = csv.writer(playlists_file)
 items_writer = csv.writer(items_file)

@@ -2,30 +2,49 @@
 Scripts and data for the RecSys Challenge 2018.
 
 ## Dataset
-[This directory](https://istitutoboella-my.sharepoint.com/:f:/g/personal/giuseppe_rizzo_ismb_it/Eh3XEurFRMFFmNXTbMpBX4YBTfRrmwVnxsLPagpwcUBscA?e=kzvYH2) contains a CSV version of the dataset released by Spotify for the RecSys Challenge 2018. We have divided the original MPD dataset in a training and a validation set. The validation set mirrors the characteristics of the [challenge set](https://recsys-challenge.spotify.com/challenge_readme) provided by Spotify.
+[This directory](https://istitutoboella-my.sharepoint.com/:f:/g/personal/giuseppe_rizzo_ismb_it/Eh3XEurFRMFFmNXTbMpBX4YBTfRrmwVnxsLPagpwcUBscA?e=kzvYH2) contains a CSV version of the dataset released by Spotify for the RecSys Challenge 2018. We have divided the original MPD dataset in training, validation and test sets. The validation and test sets mirror the characteristics of the [challenge set](https://recsys-challenge.spotify.com/challenge_readme) provided by Spotify.
 
-| File                        | Description                                                      |
-| --------------------------- | ---------------------------------------------------------------- |
-| items_challenge.csv         | The items of the test set challenge as provided by Spotify       |
-| items_mpd.csv               | The items of the training set MPD as provided by Spotify         |
-| items_training.csv          | The items of a subset of MPD created for training purposes       |
-| items_validation.csv        | The items of a subset of MPD created for validation purposes     |
-| items_validation_hidden.csv | The items that should be predicted by the recommender            |
-| pid_validation.csv          | The ids of the playlists that are included in the validation set |
-| playlists_challenge.csv     | The playlists of the test set challenge as provided by Spotify   |
-| playlists_mpd.csv           | The playlists of the training set MPD as provided by Spotify     |
-| playlists_training.csv      | The playlists of a subset of MPD created for training purposes   |
-| playlists_validation.csv    | The playlists of a subset of MPD created for validation purposes |
-| tracks_mpd.csv              | The tracks of the training set MPD as provided by Spotify        |
-| tracks_mpd_count.csv        | The tracks and the number of items per track in the MPD          |
+| File                              | Description                                                      |
+| --------------------------------- | ---------------------------------------------------------------- |
+| tracks.csv                        | The tracks of the MPD as provided by Spotify                     |
+| playlists.csv                     | The playlists of the MPD as provided by Spotify                  |
+| items.csv                         | The items of the MPD as provided by Spotify                      |
+| playlists_challenge.csv           | The playlists of the challenge set as provided by Spotify        |
+| items_challenge.csv               | The items of the challenge set as provided by Spotify            |
 
-### items_*.csv
+| File                              | Description                                                      |
+| --------------------------------- | ---------------------------------------------------------------- |
+| playlists_test.csv                | The playlists of the test set                                    |
+| playlists_test_pid.csv            | The ids of the playlists that are included in the test set       |
+| items_test.csv                    | The seed and hidden items of the test set                        |
+| items_test_x.csv                  | The seed items of the test set                                   |
+| items_test_y.csv                  | The hidden items of the test set                                 |
+
+| File                              | Description                                                      |
+| --------------------------------- | ---------------------------------------------------------------- |
+| playlists_training_validation.csv | The playlists of the training and validation set                 |
+| items_training_validation.csv     | The items of the training and validation set                     |
+
+| File                              | Description                                                      |
+| --------------------------------- | ---------------------------------------------------------------- |
+| playlists_pid.csv                 | The playlists of the validation set                              |
+| playlists_validation_pid.csv      | The ids of the playlists that are included in the validation set |
+| items_validation.csv              | The seed and hidden items of the validation set                  |
+| items_validation_x.csv            | The seed items of the validation set                             |
+| items_validation_y.csv            | The hidden items of the validation set                           |
+
+| File                              | Description                                                      |
+| --------------------------------- | ---------------------------------------------------------------- |
+| playlists_training.csv            | The playlists of the training set                                |
+| items_training.csv                | The items of the training set                                    |
+
+### items.csv
 
 * pid
 * pos
 * track_uri
 
-### playlists_(mpd|training).csv
+### playlists_training.csv
 
 * pid
 * name
@@ -38,7 +57,7 @@ Scripts and data for the RecSys Challenge 2018.
 * modified_at
 * duration_ms
 
-### playlists_(challenge|validation).csv
+### playlists_challenge.csv
 
 * pid
 * name
@@ -46,7 +65,7 @@ Scripts and data for the RecSys Challenge 2018.
 * num_holdouts
 * num_tracks
 
-###  tracks_mdp.csv
+###  tracks.csv
 
 * track_uri
 * track_name

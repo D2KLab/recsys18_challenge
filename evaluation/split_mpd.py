@@ -1,248 +1,252 @@
 import argparse
 import csv
-import json
 import random
-from os import listdir
-from os.path import join
+from os import path
 
 random.seed(1)
 
 parser = argparse.ArgumentParser(description="Split MPD")
 
-parser.add_argument('--mpd_path', default=None, required=True)
-parser.add_argument('--out_path', default=None, required=True)
+parser.add_argument('--path', default=None, required=True)
+parser.add_argument('--input_playlists', default=None, required=True)
+parser.add_argument('--input_items', default=None, required=True)
+parser.add_argument('--output_pid', default=None, required=True)
+parser.add_argument('--output_playlists', default=None, required=True)
+parser.add_argument('--output_items', default=None, required=True)
+parser.add_argument('--output_playlists_split', default=None, required=True)
+parser.add_argument('--output_items_split', default=None, required=True)
+parser.add_argument('--output_items_split_x', default=None, required=True)
+parser.add_argument('--output_items_split_y', default=None, required=True)
 parser.add_argument('--scale', type=int, required=True)
 
 args = parser.parse_args()
 
-mpd_path = args.mpd_path
-out_path = args.out_path
-scale = args.scale
-validation_size = 10 * scale
+items = {}
+tracks = {}
+playlists = {}
+playlists_pid = []
 
-tracks_count = {}
-pid_slices = {}
-slices = []
+print("Reading the playlists")
+with open(path.join(args.path, args.input_playlists), 'r', newline='', encoding='utf8') as playlists_file:
+    playlists_reader = csv.reader(playlists_file)
 
-print("Counting the number of entries per track")
-with open(join(out_path, 'tracks_mpd.csv'), 'w', newline='', encoding='utf8') as tracks_file:
-    writer = csv.writer(tracks_file)
-    for mpd_slice in listdir(mpd_path):
-        with open(join(mpd_path, mpd_slice), encoding='utf8') as json_file:
-            print("\tReading file " + mpd_slice)
-            json_slice = json.load(json_file)
-            slices.append(json_slice)
+    for playlist in playlists_reader:
+        pid = playlist[0]
+        playlists[pid] = playlist
+        playlists_pid.append(pid)
 
-            for playlist in json_slice['playlists']:
-                pid = playlist['pid']
-                pid_slices[pid] = json_slice
+print("Reading the items")
+with open(path.join(args.path, args.input_items), 'r', newline='', encoding='utf8') as items_file:
+    items_reader = csv.reader(items_file)
 
-                for track in playlist['tracks']:
-                    track_uri = track['track_uri']
-                    if track_uri in tracks_count:
-                        tracks_count[track_uri] += 1
-                    else:
-                        # This is a new track
-                        tracks_count[track_uri] = 1
-                        writer.writerow([track['track_uri'], track['track_name'],
-                                         track['artist_uri'], track['artist_name'],
-                                         track['album_uri'], track['album_name'],
-                                         track['duration_ms']])
+    for item in items_reader:
+        pid = item[0]
+        track_uri = item[2]
 
-# Saving the count of the entries
-with open(join(out_path, 'tracks_mpd_count.csv'), 'w', newline='', encoding='utf8') as count_file:
-    writer = csv.writer(count_file)
-    for track_uri, count in tracks_count.items():
-        writer.writerow([track_uri, count])
+        if track_uri in tracks:
+            tracks[track_uri] += 1
+        else:
+            tracks[track_uri] = 1
 
-print("Selecting validation playlists randomly")
-validation_playlists = []
-candidate_pid_list = list(pid_slices)
+        if pid in items:
+            items[pid].append(item)
+        else:
+            items[pid] = [item]
+
+print("Selecting split playlists randomly")
+split_playlists = []
+candidate_pid_list = list(playlists_pid)
 random.shuffle(candidate_pid_list)
 
 for candidate_pid in candidate_pid_list:
-    candidate_playlist = None
-    candidate_count = tracks_count.copy()
+    candidate_tracks = tracks.copy()
 
-    # Check that pid is not already in the validation set
-    if candidate_pid in validation_playlists:
+    # Check that pid is not already in the split set
+    if candidate_pid in split_playlists:
         continue
 
     # Load the candidate playlist
-    json_slice = pid_slices[candidate_pid]
-
-    for playlist in json_slice['playlists']:
-        if playlist['pid'] == candidate_pid:
-            candidate_playlist = playlist
-            break
+    candidate_playlist = playlists[candidate_pid]
 
     # Innocent until proven guilty
     good_candidate = True
 
     # Check that pid does not contain unique tracks
-    for track in candidate_playlist['tracks']:
-        track_uri = track['track_uri']
-
-        if candidate_count[track_uri] > 1:
-            candidate_count[track_uri] -= 1
+    for item in candidate_playlist:
+        track_uri = item[2]
+        if candidate_tracks[track_uri] > 1:
+            candidate_tracks[track_uri] -= 1
         else:
             good_candidate = False
             break
 
     # Challenge category
-    validation_index = len(validation_playlists)
+    validation_index = len(split_playlists)
 
     # Check the length of the playlist
-    if validation_index < 1 * scale:
+    if validation_index < 1 * args.scale:
         # Only title
-        if len(candidate_playlist['tracks']) < 1:
+        if len(candidate_playlist) < 1:
             good_candidate = False
-    elif validation_index < 2 * scale:
+    elif validation_index < 2 * args.scale:
         # Title and first one
-        if len(candidate_playlist['tracks']) <= 1:
+        if len(candidate_playlist) <= 1:
             good_candidate = False
-    elif validation_index < 3 * scale:
+    elif validation_index < 3 * args.scale:
         # Title and first five
-        if len(candidate_playlist['tracks']) <= 5:
+        if len(candidate_playlist) <= 5:
             good_candidate = False
-    elif validation_index < 4 * scale:
+    elif validation_index < 4 * args.scale:
         # No title and first five
-        if len(candidate_playlist['tracks']) <= 5:
+        if len(candidate_playlist) <= 5:
             good_candidate = False
-    elif validation_index < 5 * scale:
+    elif validation_index < 5 * args.scale:
         # Title and first ten
-        if len(candidate_playlist['tracks']) <= 10:
+        if len(candidate_playlist) <= 10:
             good_candidate = False
-    elif validation_index < 6 * scale:
+    elif validation_index < 6 * args.scale:
         # No title and first ten
-        if len(candidate_playlist['tracks']) <= 10:
+        if len(candidate_playlist) <= 10:
             good_candidate = False
-    elif validation_index < 7 * scale:
+    elif validation_index < 7 * args.scale:
         # Title and first twenty-five
-        if len(candidate_playlist['tracks']) <= 25:
+        if len(candidate_playlist) <= 25:
             good_candidate = False
-    elif validation_index < 8 * scale:
+    elif validation_index < 8 * args.scale:
         # Title and random twenty-five
-        if len(candidate_playlist['tracks']) <= 25:
+        if len(candidate_playlist) <= 25:
             good_candidate = False
-    elif validation_index < 9 * scale:
+    elif validation_index < 9 * args.scale:
         # Title and first a hundred
-        if len(candidate_playlist['tracks']) <= 100:
+        if len(candidate_playlist) <= 100:
             good_candidate = False
     else:
         # Title and random a hundred
-        if len(candidate_playlist['tracks']) <= 100:
+        if len(candidate_playlist) <= 100:
             good_candidate = False
 
     # Commit the changes
     if good_candidate is True:
-        tracks_count = candidate_count
-        validation_playlists.append(candidate_pid)
-        print("\tValidation set size is", len(validation_playlists))
+        tracks = candidate_tracks
+        split_playlists.append(candidate_pid)
+        print("\tSplit set size is", len(split_playlists))
 
         # Check if we are done
-        if len(validation_playlists) >= validation_size:
+        if len(split_playlists) >= args.scale * 10:
             break
 
 # Saving the results
-with open(join(out_path, 'pid_validation.csv'), 'w', newline='', encoding='utf8') as pid_validation_file:
-    pid_validation_writer = csv.writer(pid_validation_file)
-    for pid in validation_playlists:
-        pid_validation_writer.writerow([pid])
+with open(path.join(args.path, args.output_pid), 'w', newline='', encoding='utf8') as pid_file:
+    pid_writer = csv.writer(pid_file)
+    for pid in split_playlists:
+        pid_writer.writerow([pid])
 
-playlists_training_file = open(join(out_path, 'playlists_training.csv'), 'w', newline='', encoding='utf8')
-items_training_file = open(join(out_path, 'items_training.csv'), 'w', newline='', encoding='utf8')
-playlists_validation_file = open(join(out_path, 'playlists_validation.csv'), 'w', newline='', encoding='utf8')
-items_validation_file = open(join(out_path, 'items_validation.csv'), 'w', newline='', encoding='utf8')
-items_validation_hidden_file = open(join(out_path, 'items_validation_hidden.csv'), 'w', newline='', encoding='utf8')
+output_playlists_file = open(path.join(args.path, args.output_playlists), 'w', newline='', encoding='utf8')
+output_items_file = open(path.join(args.path, args.output_items), 'w', newline='', encoding='utf8')
+output_playlists_split_file = open(path.join(args.path, args.output_playlists_split), 'w', newline='', encoding='utf8')
+output_items_split_file = open(path.join(args.path, args.output_items_split), 'w', newline='', encoding='utf8')
+output_items_split_x_file = open(path.join(args.path, args.output_items_split_x), 'w', newline='', encoding='utf8')
+output_items_split_y_file = open(path.join(args.path, args.output_items_split_y), 'w', newline='', encoding='utf8')
 
-playlists_training_writer = csv.writer(playlists_training_file)
-items_training_writer = csv.writer(items_training_file)
-playlists_validation_writer = csv.writer(playlists_validation_file)
-items_validation_writer = csv.writer(items_validation_file)
-items_validation_hidden_writer = csv.writer(items_validation_hidden_file)
+output_playlists_writer = csv.writer(output_playlists_file)
+output_items_writer = csv.writer(output_items_file)
+output_playlists_split_writer = csv.writer(output_playlists_split_file)
+output_items_split_writer = csv.writer(output_items_split_file)
+output_items_split_x_writer = csv.writer(output_items_split_x_file)
+output_items_split_y_writer = csv.writer(output_items_split_y_file)
 
-for json_slice in slices:
-    for playlist in json_slice['playlists']:
-        # Training playlist
-        if playlist['pid'] not in validation_playlists:
-            playlists_training_writer.writerow([playlist['pid'], playlist['name'],
-                                                playlist['collaborative'], playlist['num_tracks'],
-                                                playlist['num_artists'], playlist['num_albums'],
-                                                playlist['num_followers'], playlist['num_edits'],
-                                                playlist['modified_at'], playlist['duration_ms']])
+for playlist in playlists:
+    pid = playlist[0]
 
-            for track in playlist['tracks']:
-                items_training_writer.writerow([playlist['pid'], track['pos'], track['track_uri']])
+    # Original playlist
+    if pid not in split_playlists:
+        output_playlists_writer.writerow(playlist)
 
-        # Validation playlist
+        for item in items[pid]:
+            output_items_writer.writerow(item)
+
+    # Split playlist
+    else:
+        # Challenge category
+        validation_index = split_playlists.index(pid)
+
+        if validation_index < 1 * args.scale:
+            # Only title
+            playlist_name = playlist[1]
+            items = items[pid][:]
+            items_x = []
+            items_y = items[pid][:]
+        elif validation_index < 2 * args.scale:
+            # Title and first one
+            playlist_name = playlist[1]
+            items = items[pid][:]
+            items_x = items[pid][:1]
+            items_y = items[pid][1:]
+        elif validation_index < 3 * args.scale:
+            # Title and first five
+            playlist_name = playlist[1]
+            items = items[pid][:]
+            items_x = items[pid][:5]
+            items_y = items[pid][5:]
+        elif validation_index < 4 * args.scale:
+            # No title and first five
+            playlist_name = None
+            items = items[pid][:]
+            items_x = items[pid][:5]
+            items_y = items[pid][5:]
+        elif validation_index < 5 * args.scale:
+            # Title and first ten
+            playlist_name = playlist[1]
+            items = items[pid][:]
+            items_x = items[pid][:10]
+            items_y = items[pid][10:]
+        elif validation_index < 6 * args.scale:
+            # No title and first ten
+            playlist_name = None
+            items = items[pid][:]
+            items_x = items[pid][:10]
+            items_y = items[pid][10:]
+        elif validation_index < 7 * args.scale:
+            # Title and first twenty-five
+            playlist_name = playlist[1]
+            items = items[pid][:]
+            items_x = items[pid][:25]
+            items_y = items[pid][25:]
+        elif validation_index < 8 * args.scale:
+            # Title and random twenty-five
+            playlist_name = playlist[1]
+            items = items[pid][:]
+            random.shuffle(items[pid])
+            items_x = items[pid][:25]
+            items_y = items[pid][25:]
+        elif validation_index < 9 * args.scale:
+            # Title and first a hundred
+            playlist_name = playlist[1]
+            items = items[pid][:]
+            items_x = items[pid][:100]
+            items_y = items[pid][100:]
         else:
-            # Challenge category
-            validation_index = validation_playlists.index(playlist['pid'])
+            # Title and random a hundred
+            playlist_name = playlist[1]
+            items = items[pid][:]
+            random.shuffle(items[pid])
+            items_x = items[pid][:100]
+            items_y = items[pid][100:]
 
-            if validation_index < 1 * scale:
-                # Only title
-                playlist_name = playlist['name']
-                tracks_provided = []
-                tracks_hidden = playlist['tracks']
-            elif validation_index < 2 * scale:
-                # Title and first one
-                playlist_name = playlist['name']
-                tracks_provided = playlist['tracks'][:1]
-                tracks_hidden = playlist['tracks'][1:]
-            elif validation_index < 3 * scale:
-                # Title and first five
-                playlist_name = playlist['name']
-                tracks_provided = playlist['tracks'][:5]
-                tracks_hidden = playlist['tracks'][5:]
-            elif validation_index < 4 * scale:
-                # No title and first five
-                playlist_name = None
-                tracks_provided = playlist['tracks'][:5]
-                tracks_hidden = playlist['tracks'][5:]
-            elif validation_index < 5 * scale:
-                # Title and first ten
-                playlist_name = playlist['name']
-                tracks_provided = playlist['tracks'][:10]
-                tracks_hidden = playlist['tracks'][10:]
-            elif validation_index < 6 * scale:
-                # No title and first ten
-                playlist_name = None
-                tracks_provided = playlist['tracks'][:10]
-                tracks_hidden = playlist['tracks'][10:]
-            elif validation_index < 7 * scale:
-                # Title and first twenty-five
-                playlist_name = playlist['name']
-                tracks_provided = playlist['tracks'][:25]
-                tracks_hidden = playlist['tracks'][25:]
-            elif validation_index < 8 * scale:
-                # Title and random twenty-five
-                playlist_name = playlist['name']
-                random.shuffle(playlist['tracks'])
-                tracks_provided = playlist['tracks'][:25]
-                tracks_hidden = playlist['tracks'][25:]
-            elif validation_index < 9 * scale:
-                # Title and first a hundred
-                playlist_name = playlist['name']
-                tracks_provided = playlist['tracks'][:100]
-                tracks_hidden = playlist['tracks'][100:]
-            else:
-                # Title and random a hundred
-                playlist_name = playlist['name']
-                random.shuffle(playlist['tracks'])
-                tracks_provided = playlist['tracks'][:100]
-                tracks_hidden = playlist['tracks'][100:]
+        # Sort tracks by position
+        items = sorted(items, key=lambda row: row[1])
+        items_x = sorted(items_x, key=lambda row: row[1])
+        items_y = sorted(items_y, key=lambda row: row[1])
 
-            # Sort tracks by position
-            tracks_provided = sorted(tracks_provided, key=lambda item: item['pos'])
-            tracks_hidden = sorted(tracks_hidden, key=lambda item: item['pos'])
+        output_playlists_writer.writerow([pid, playlist_name,
+                                          len(items_x), len(items_y),
+                                          len(items_x + items_y)])
 
-            playlists_validation_writer.writerow([playlist['pid'], playlist_name,
-                                                  len(tracks_provided), len(tracks_hidden),
-                                                  len(tracks_provided + tracks_hidden)])
+        for item in items:
+            output_items_split_writer.writerow(item)
 
-            for track in tracks_provided:
-                items_validation_writer.writerow([playlist['pid'], track['pos'], track['track_uri']])
+        for item in items_x:
+            output_items_split_x_writer.writerow(item)
 
-            for track in tracks_hidden:
-                items_validation_hidden_writer.writerow([playlist['pid'], track['pos'], track['track_uri']])
+        for item in items_y:
+            output_items_split_y_writer.writerow(item)

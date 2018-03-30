@@ -20,16 +20,16 @@ def print_evaluation(metric):
 def track2artist(tracks_local):
     artists = []
     for track in tracks_local:
-        artists.append(tracks_mpd[track])
+        artists.append(tracks[track])
     return artists
 
 
 parser = argparse.ArgumentParser(description="Evaluator")
 
-parser.add_argument('--tracks_mpd', default='dataset/tracks_mpd.csv', required=False)
-parser.add_argument('--pid_validation', default='dataset/pid_validation.csv', required=False)
-parser.add_argument('--items_validation', default='dataset/items_validation.csv', required=False)
-parser.add_argument('--items_validation_hidden', default='dataset/items_validation_hidden.csv', required=False)
+parser.add_argument('--tracks', default=None, required=True)
+parser.add_argument('--playlists_test_pid', default=None, required=True)
+parser.add_argument('--items_test_x', default=None, required=True)
+parser.add_argument('--items_test_y', default=None, required=True)
 parser.add_argument('--items_submission', default=None, required=True)
 parser.add_argument('--verbose', action='store_true')
 
@@ -37,41 +37,41 @@ args = parser.parse_args()
 
 print('Evaluating the submission file ' + args.items_submission + '\n')
 
-tracks_mpd_file = open(args.tracks_mpd, 'r', newline='', encoding='utf8')
-pid_validation_file = open(args.pid_validation, 'r', newline='', encoding='utf8')
-items_validation_file = open(args.items_validation, 'r', newline='', encoding='utf8')
-items_validation_hidden_file = open(args.items_validation_hidden, 'r', newline='', encoding='utf8')
+tracks_file = open(args.tracks, 'r', newline='', encoding='utf8')
+playlists_test_pid_file = open(args.playlists_test_pid, 'r', newline='', encoding='utf8')
+items_test_x_file = open(args.items_test_x, 'r', newline='', encoding='utf8')
+items_test_y_file = open(args.items_test_y, 'r', newline='', encoding='utf8')
 items_submission_file = open(args.items_submission, 'r', newline='', encoding='utf8')
 
-tracks_mpd_reader = csv.reader(tracks_mpd_file)
-pid_validation_reader = csv.reader(pid_validation_file)
-items_validation_reader = csv.reader(items_validation_file)
-items_validation_hidden_reader = csv.reader(items_validation_hidden_file)
+tracks_reader = csv.reader(tracks_file)
+playlists_test_pid_reader = csv.reader(playlists_test_pid_file)
+items_test_x_reader = csv.reader(items_test_x_file)
+items_test_y_reader = csv.reader(items_test_y_file)
 items_submission_reader = csv.reader(items_submission_file)
 
 # Read tracks
-tracks_mpd = {}
+tracks = {}
 
-for row in tracks_mpd_reader:
+for row in tracks_reader:
     track_uri = row[0]
     artist_uri = row[2]
-    tracks_mpd[track_uri] = artist_uri
+    tracks[track_uri] = artist_uri
 
 # Read PIDs
-pids = []
+playlists_pid = []
 
-for row in pid_validation_reader:
-    pids.append(row[0])
+for row in playlists_test_pid_reader:
+    playlists_pid.append(row[0])
 
-# Read validation items
-items_validation = {}
+# Read test items
+items_test = {}
 
-for row in items_validation_reader:
+for row in items_test_x_reader:
     pid = row[0]
-    if pid in items_validation:
-        items_validation[pid].append(row[2])
+    if pid in items_test:
+        items_test[pid].append(row[2])
     else:
-        items_validation[pid] = [row[2]]
+        items_test[pid] = [row[2]]
 
 # Read the submission
 submission = {}
@@ -91,15 +91,15 @@ for row in items_submission_reader:
 
     # Check the length of a row
     if len(row) != 501:
-        print('The playlist ' + row[0] + ' has ' + str(len(row) - 1) + ' tracks instead of 500.')
+        print('The playlist ' + row[0] + ' has ' + str(len(row) - 1) + ' items instead of 500.')
         exit(1)
 
     pid = row[0]
-    tracks = row[1:]
+    items = row[1:]
 
     # Check that the playlist is a required one
-    if pid not in pids:
-        print('The playlist ' + pid + ' is not in the validation set.')
+    if pid not in playlists_pid:
+        print('The playlist ' + pid + ' is not in the test set.')
         exit(1)
 
     # Check that the playlist was not already provided
@@ -107,50 +107,50 @@ for row in items_submission_reader:
         print('The playlist ' + pid + ' is duplicated.')
         exit(1)
 
-    # Check that the tracks are not duplicated
-    if len(set(tracks)) != 500:
-        print('The playlist ' + pid + ' contains duplicated tracks.')
+    # Check that the items are not duplicated
+    if len(set(items)) != 500:
+        print('The playlist ' + pid + ' contains duplicated items.')
         exit(1)
 
-    # Check that the tracks are valid
-    for track_uri in tracks:
-        if track_uri not in tracks_mpd:
+    # Check that the items are valid
+    for track_uri in items:
+        if track_uri not in tracks:
             print('The track uri ' + track_uri + ' from playlist ' + pid + ' is invalid.')
             exit(1)
 
-    # Check that the tracks are not in the validation set
-    for track_uri in tracks:
+    # Check that the tracks are not in the test set
+    for track_uri in items:
         try:
-            if track_uri in items_validation[pid]:
-                print('The track uri ' + track_uri + ' from playlist ' + pid + ' is in the validation set.')
+            if track_uri in items_test[pid]:
+                print('The track uri ' + track_uri + ' from playlist ' + pid + ' is in the test set.')
                 exit(1)
         except KeyError:
             # For playlists with no items
             continue
 
-    submission[pid] = tracks
+    submission[pid] = items
 
 # Check that all the playlists are available
-for pid in pids:
+for pid in playlists_pid:
     if pid not in submission:
         print('The playlist ' + pid + ' is not included in the submission.')
         exit(1)
 
-# Read hidden items
-items_hidden = {}
+# Read y items
+items_y = {}
 
-for row in items_validation_hidden_reader:
+for row in items_test_y_reader:
     pid = row[0]
-    if pid in items_hidden:
-        items_hidden[pid].append(row[2])
+    if pid in items_y:
+        items_y[pid].append(row[2])
     else:
-        items_hidden[pid] = [row[2]]
+        items_y[pid] = [row[2]]
 
 # Precision per track
-precision_tracks = np.full(len(pids), 0.0)
+precision_tracks = np.full(len(playlists_pid), 0.0)
 
-for i, pid in enumerate(pids):
-    g_tracks = items_hidden[pid]
+for i, pid in enumerate(playlists_pid):
+    g_tracks = items_y[pid]
     g_tracks_size = len(g_tracks)
     r_tracks = submission[pid][:g_tracks_size]
 
@@ -165,10 +165,10 @@ if args.verbose is True:
     print_evaluation(precision_tracks)
 
 # Precision per artist
-precision_artists = np.full(len(pids), 0.0)
+precision_artists = np.full(len(playlists_pid), 0.0)
 
-for i, pid in enumerate(pids):
-    g_artists = track2artist(items_hidden[pid])
+for i, pid in enumerate(playlists_pid):
+    g_artists = track2artist(items_y[pid])
     g_artists_size = len(g_artists)
     r_artists = track2artist(submission[pid][:g_artists_size])
 
@@ -183,10 +183,10 @@ if args.verbose is True:
     print_evaluation(precision_artists)
 
 # NDCG per track
-ndcg_tracks = np.full(len(pids), 0.0)
+ndcg_tracks = np.full(len(playlists_pid), 0.0)
 
-for i, pid in enumerate(pids):
-    g_tracks = items_hidden[pid]
+for i, pid in enumerate(playlists_pid):
+    g_tracks = items_y[pid]
     r_tracks = submission[pid]
 
     # DCG
@@ -213,10 +213,10 @@ if args.verbose is True:
     print_evaluation(ndcg_tracks)
 
 # NDCG per artist
-ndcg_artists = np.full(len(pids), 0.0)
+ndcg_artists = np.full(len(playlists_pid), 0.0)
 
-for i, pid in enumerate(pids):
-    g_artists = track2artist(items_hidden[pid])
+for i, pid in enumerate(playlists_pid):
+    g_artists = track2artist(items_y[pid])
     r_artists = track2artist(submission[pid])
 
     # DCG
@@ -243,10 +243,10 @@ if args.verbose is True:
     print_evaluation(ndcg_artists)
 
 # Clicks per track
-clicks_tracks = np.full(len(pids), 51)
+clicks_tracks = np.full(len(playlists_pid), 51)
 
-for i, pid in enumerate(pids):
-    g_tracks = items_hidden[pid]
+for i, pid in enumerate(playlists_pid):
+    g_tracks = items_y[pid]
     r_tracks = submission[pid]
 
     for index, track_uri in enumerate(r_tracks):
@@ -259,10 +259,10 @@ if args.verbose is True:
     print_evaluation(clicks_tracks)
 
 # Clicks per artist
-clicks_artists = np.full(len(pids), 51)
+clicks_artists = np.full(len(playlists_pid), 51)
 
-for i, pid in enumerate(pids):
-    g_artists = track2artist(items_hidden[pid])
+for i, pid in enumerate(playlists_pid):
+    g_artists = track2artist(items_y[pid])
     r_artists = track2artist(submission[pid])
 
     for index, artist_uri in enumerate(r_artists):

@@ -2,7 +2,7 @@ import argparse
 import csv
 import json
 from os import listdir
-from os.path import join
+from os import path
 
 parser = argparse.ArgumentParser(description="Convert MPD")
 
@@ -14,14 +14,18 @@ args = parser.parse_args()
 mpd_path = args.mpd_path
 out_path = args.out_path
 
-playlists_file = open(join(out_path, 'playlists_mpd.csv'), 'w', newline='', encoding='utf8')
-items_file = open(join(out_path, 'items_mpd.csv'), 'w', newline='', encoding='utf8')
+items_file = open(path.join(out_path, 'items.csv'), 'w', newline='', encoding='utf8')
+playlists_file = open(path.join(out_path, 'playlists.csv'), 'w', newline='', encoding='utf8')
+tracks_file = open(path.join(out_path, 'tracks.csv'), 'w', newline='', encoding='utf8')
 
-playlists_writer = csv.writer(playlists_file)
 items_writer = csv.writer(items_file)
+playlists_writer = csv.writer(playlists_file)
+tracks_writer = csv.writer(tracks_file)
+
+tracks = []
 
 for mpd_slice in listdir(mpd_path):
-    with open(join(mpd_path, mpd_slice), encoding='utf8') as json_file:
+    with open(path.join(mpd_path, mpd_slice), encoding='utf8') as json_file:
         print("\tReading file " + mpd_slice)
         json_slice = json.load(json_file)
 
@@ -34,3 +38,11 @@ for mpd_slice in listdir(mpd_path):
 
             for track in playlist['tracks']:
                 items_writer.writerow([playlist['pid'], track['pos'], track['track_uri']])
+
+                if track['track_uri'] not in tracks:
+                    # This is a new track
+                    tracks.append(track['track_uri'])
+                    tracks_writer.writerow([track['track_uri'], track['track_name'],
+                                            track['artist_uri'], track['artist_name'],
+                                            track['album_uri'], track['album_name'],
+                                            track['duration_ms']])
