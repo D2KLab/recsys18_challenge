@@ -10,16 +10,13 @@ parser.add_argument('--out_path', default=None, required=True)
 
 args = parser.parse_args()
 
-json_path = args.json_path
-out_path = args.out_path
-
-playlists_file = open(path.join(out_path, 'playlists_challenge.csv'), 'w', newline='', encoding='utf8')
-items_file = open(path.join(out_path, 'items_challenge.csv'), 'w', newline='', encoding='utf8')
+playlists_file = open(path.join(args.out_path, 'playlists_challenge.csv'), 'w', newline='', encoding='utf8')
+items_file = open(path.join(args.out_path, 'items_challenge.csv'), 'w', newline='', encoding='utf8')
 
 playlists_writer = csv.writer(playlists_file)
 items_writer = csv.writer(items_file)
 
-with open(json_path, encoding='utf8') as json_file:
+with open(args.challenge_path, encoding='utf8') as json_file:
     json_slice = json.load(json_file)
 
     for playlist in json_slice['playlists']:
