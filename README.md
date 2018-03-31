@@ -27,7 +27,7 @@ Scripts and data for the RecSys Challenge 2018.
 
 | File                              | Description                                                      |
 | --------------------------------- | ---------------------------------------------------------------- |
-| playlists_pid.csv                 | The playlists of the validation set                              |
+| playlists_validation.csv          | The playlists of the validation set                              |
 | playlists_validation_pid.csv      | The ids of the playlists that are included in the validation set |
 | items_validation.csv              | The seed and hidden items of the validation set                  |
 | items_validation_x.csv            | The seed items of the validation set                             |
