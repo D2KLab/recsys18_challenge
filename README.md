@@ -2,7 +2,7 @@
 Scripts and data for the RecSys Challenge 2018.
 
 ## Dataset
-[This directory](https://istitutoboella-my.sharepoint.com/:f:/g/personal/giuseppe_rizzo_ismb_it/Eh3XEurFRMFFmNXTbMpBX4YBTfRrmwVnxsLPagpwcUBscA?e=kzvYH2) contains a CSV version of the dataset released by Spotify for the RecSys Challenge 2018. We have divided the original MPD dataset in training, validation and test sets. The validation and test sets mirror the characteristics of the [challenge set](https://recsys-challenge.spotify.com/challenge_readme) provided by Spotify.
+[This directory](https://istitutoboella-my.sharepoint.com/:f:/g/personal/giuseppe_rizzo_ismb_it/EsATRk8BkslNm8J4XKMOTlYB_bAlNpZ4J5JY8phlL6gYQg?e=Fre1F7) contains a CSV version of the dataset released by Spotify for the RecSys Challenge 2018. We have divided the original MPD dataset in training, validation and test sets. The validation and test sets mirror the characteristics of the [challenge set](https://recsys-challenge.spotify.com/challenge_readme) provided by Spotify.
 
 | File                              | Description                                                      |
 | --------------------------------- | ---------------------------------------------------------------- |
