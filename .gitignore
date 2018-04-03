@@ -71,3 +71,4 @@ venv/
 # Intellij IDE
 .idea/
 .ipynb_checkpoints/
+__pycache__/
