@@ -234,9 +234,9 @@ for playlist in playlists.values():
             items_y = items[pid][100:]
 
         # Sort tracks by position
-        items_xy = sorted(items_xy, key=lambda row: row[1])
-        items_x = sorted(items_x, key=lambda row: row[1])
-        items_y = sorted(items_y, key=lambda row: row[1])
+        items_xy = sorted(items_xy, key=lambda row: int(row[1]))
+        items_x = sorted(items_x, key=lambda row: int(row[1]))
+        items_y = sorted(items_y, key=lambda row: int(row[1]))
 
         output_playlists_split_writer.writerow([pid, playlist_name,
                                                 len(items_x), len(items_y),
