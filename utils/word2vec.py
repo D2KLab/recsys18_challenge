@@ -12,34 +12,55 @@ parser.add_argument('--test', default=False, action='store_true')
 
 args = parser.parse_args()
 
-
-# memory-friendly iterator streaming through the text file
-
 class MySentences(object):
 
-    def __init__(self, file, sep=';'):
+    def __init__(self, file, sep=','):
 
         self.file = file
         self.sep = sep
- 
+    
+    # streams through the items_training.csv and yield playlists
+
     def __iter__(self):
-        
-        for line in open(self.file):
 
-            line = line.strip('\n').split(self.sep)
+        playlist = []
 
-            yield line
+        with open(self.file, "r") as f:
+
+            prev_id = -1
+
+            for i, line in enumerate(f):
+
+                line_split = line.replace('\n', '').split(',')
+
+                curr_id = line_split[0]
+
+                if i > 0:
+
+                    if curr_id != prev_id:
+
+                        yield playlist
+
+                        playlist = []
+
+                playlist.append(line_split[-1])
+
+                prev_id = curr_id
+
 
 if not args.test:  # train the model
 
     sentences = MySentences(args.file)
 
+    for sentence in sentences:
+        print(len(sentence))
+
     model = Word2Vec(sentences, workers=args.workers, min_count=0)
 
-    file_name = args.file.split('/')[1]
+    file_name = args.file.split('/')[-1]
     file_name = file_name.split('.')[0]
 
-    model.save('models/'+file_name+'wv')
+    model.save('../models/'+file_name+'.w2v')
 
 else:  # test the model
 
