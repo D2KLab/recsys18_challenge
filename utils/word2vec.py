@@ -37,8 +37,6 @@ if not args.test:  # train the model
     dataset = dataset.Dataset('../data')
 
     sentences = MySentences(args.file, dataset)
-    for sentence in sentences:
-        print(len(sentence))
 
     model = Word2Vec(sentences, workers=args.workers, min_count=0)
 
