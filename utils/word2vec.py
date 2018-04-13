@@ -1,6 +1,7 @@
 from gensim.models import Word2Vec
 import argparse
 import logging
+import dataset
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 
@@ -14,48 +15,30 @@ args = parser.parse_args()
 
 class MySentences(object):
 
-    def __init__(self, file, sep=','):
+    def __init__(self, file, dataset, sep=','):
 
         self.file = file
         self.sep = sep
+        self.dataset = dataset
     
-    # streams through the items_training.csv and yield playlists
+    # streams through the items_training.csv and yield sequences of items
 
     def __iter__(self):
 
-        playlist = []
+        for playlist in self.dataset.reader('playlists_%s.csv' %self.file, 'items_%s.csv' %self.file):
 
-        with open(self.file, "r") as f:
+            #  convert ids to strings
+            sentence = list(map(lambda x : str(x), playlist['items']))
 
-            for i, line in enumerate(f):
-
-                line_split = line.replace('\n', '').split(',')
-
-                curr_id = line_split[0]
-
-                # only for the first line
-                if i == 0:
-
-                    prev_id = curr_id
-
-                # check if there is a new playlist
-                if curr_id != prev_id:
-
-                    yield playlist
-
-                    playlist = []
-
-                playlist.append(line_split[-1])
-
-                prev_id = curr_id
-
-            # last playlist
-            yield playlist
-
+            yield sentence
 
 if not args.test:  # train the model
+    
+    dataset = dataset.Dataset('../data')
 
-    sentences = MySentences(args.file)
+    sentences = MySentences(args.file, dataset)
+    for sentence in sentences:
+        print(len(sentence))
 
     model = Word2Vec(sentences, workers=args.workers, min_count=0)
 
