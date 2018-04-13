@@ -27,30 +27,38 @@ class MySentences(object):
 
         with open(self.file, "r") as f:
 
-            prev_id = -1
-
             for i, line in enumerate(f):
 
                 line_split = line.replace('\n', '').split(',')
 
                 curr_id = line_split[0]
 
-                if i > 0:
+                # only for the first line
+                if i == 0:
 
-                    if curr_id != prev_id:
+                    prev_id = curr_id
 
-                        yield playlist
+                # check if there is a new playlist
+                if curr_id != prev_id:
 
-                        playlist = []
+                    yield playlist
+
+                    playlist = []
 
                 playlist.append(line_split[-1])
 
                 prev_id = curr_id
 
+            # last playlist
+            yield playlist
+
 
 if not args.test:  # train the model
 
     sentences = MySentences(args.file)
+
+    for sentence in sentences:
+        print(len(sentence))
 
     model = Word2Vec(sentences, workers=args.workers, min_count=0)
 
