@@ -34,7 +34,7 @@ class MySentences(object):
 
 if not args.test:  # train the model
     
-    dataset = dataset.Dataset('../data')
+    dataset = dataset.Dataset('../dataset')
 
     sentences = MySentences(args.file, dataset)
 
