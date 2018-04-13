@@ -52,9 +52,6 @@ if not args.test:  # train the model
 
     sentences = MySentences(args.file)
 
-    for sentence in sentences:
-        print(len(sentence))
-
     model = Word2Vec(sentences, workers=args.workers, min_count=0)
 
     file_name = args.file.split('/')[-1]
