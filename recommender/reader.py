@@ -21,40 +21,26 @@ from __future__ import print_function
 
 import collections
 import os
-
 import tensorflow as tf
 
-
-def _read_items(filename):
+def _read_items(filename, dataset):
 
     items = []
 
-    with open(filename, "r") as f:
+    for playlist in dataset.reader('playlists_%s.csv' %filename, 'items_%s.csv' %filename):
 
-        prev_id = -1
+        items = items + list(map(lambda x : str(x), playlist['items']))
 
-        for i, line in enumerate(f):
+        items.append('<eos>')
 
-            line_split = line.replace('\n', '').split(',')
-
-            items.append(line_split[-1])
-
-            curr_id = line_split[0]
-
-            if i > 0:
-
-                if curr_id != prev_id:
-
-                    items.append('<eos>')
-
-            prev_id = curr_id
+    print(items)
 
     return items
 
 
-def _build_vocab(filename):
+def _build_vocab(filename, dataset):
 
-    data = _read_items(filename)
+    data = _read_items(filename, dataset)
 
     counter = collections.Counter(data)
     count_pairs = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
@@ -66,11 +52,12 @@ def _build_vocab(filename):
 
 
 def _file_to_word_ids(filename, word_to_id):
-    data = _read_items(filename)
+
+    data = _read_items(filename, dataset)
     return [word_to_id[word] for word in data if word in word_to_id]
 
 
-def ptb_raw_data(data_path=None):
+def read_raw_data(dataset=None):
     """Load MPD dataset from data directory "data_path".
 
     pid,pos,track_id
@@ -84,14 +71,10 @@ def ptb_raw_data(data_path=None):
       where each of the data objects can be passed to PTBIterator.
     """
 
-    train_path = os.path.join(data_path, "items_training.csv")
-    valid_path = os.path.join(data_path, "items_validation.csv")
-    test_path = os.path.join(data_path, "items_test.csv")
-
-    word_to_id = _build_vocab(train_path)
-    train_data = _file_to_word_ids(train_path, word_to_id)
-    valid_data = _file_to_word_ids(valid_path, word_to_id)
-    test_data = _file_to_word_ids(test_path, word_to_id)
+    word_to_id = _build_vocab("training", dataset)
+    train_data = _file_to_word_ids("training", word_to_id)
+    valid_data = _file_to_word_ids("validation", word_to_id)
+    test_data = _file_to_word_ids("test", word_to_id)
     vocabulary = len(word_to_id)
     return train_data, valid_data, test_data, vocabulary
 

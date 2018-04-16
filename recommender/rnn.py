@@ -58,6 +58,9 @@ import reader
 import util
 
 from tensorflow.python.client import device_lib
+import sys
+sys.path.append('.')
+from utils.dataset import Dataset
 
 flags = tf.flags
 logging = tf.logging
@@ -435,7 +438,9 @@ def main(_):
             "which is less than the requested --num_gpus=%d."
             % (len(gpus), FLAGS.num_gpus))
 
-    raw_data = reader.ptb_raw_data(FLAGS.data_path)
+    dataset = Dataset(FLAGS.data_path)
+
+    raw_data = reader.read_raw_data(dataset)
     train_data, valid_data, test_data, _ = raw_data
 
     config = get_config()
