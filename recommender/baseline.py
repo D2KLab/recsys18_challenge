@@ -1,5 +1,5 @@
 import random
-
+from gensim.models import Word2Vec
 
 class MostPopular:
 
@@ -66,4 +66,47 @@ class Random:
                     items.append(item)
 
             playlist['items'] = items
+            submission_writer.write(playlist)
+
+
+class Word2Rec:
+
+    def __init__(self, dataset, model_file):
+
+        self.dataset = dataset
+
+        model = Word2Vec.load(model_file)
+
+        self.model = model.wv
+
+        del model
+
+    def run(self, submission_path):
+
+        # Create the submission
+
+        submission_writer = self.dataset.writer(submission_path)
+
+        for playlist in self.dataset.reader('playlists_test.csv', 'items_test_x.csv'):
+
+            items = []
+
+            count = 0
+
+            seeds = list(map(lambda x: str(x), playlist['items']))
+
+            length_seeds = len(seeds)
+
+            n = 500 - length_seeds
+
+            max_num_seed = 100
+
+            predictions_and_seeds = self.model.most_similar(positive=seeds, topn=n+max_num_seed)
+
+            predictions_and_seeds = [p for (p,s) in predictions_and_seeds]
+
+            predictions = [p for p in predictions_and_seeds if p not in seeds][0:500]
+
+            playlist['items'] = list(map(lambda x: int(x), predictions)) 
+
             submission_writer.write(playlist)
