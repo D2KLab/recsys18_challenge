@@ -1,4 +1,5 @@
 import random
+import os.path
 from gensim.models import Word2Vec
 
 
@@ -21,8 +22,15 @@ class Recommender:
             self.test_playlists = 'playlists_challenge.csv'
             self.test_items = 'items_challenge.csv'
 
-    def run(self, submission_path):
+    def recommend(self, playlist):
         raise NotImplementedError
+
+    def run(self, submission_path):
+        submission_writer = self.dataset.writer(submission_path)
+
+        for playlist in self.dataset.reader(self.test_playlists, self.test_items):
+            self.recommend(playlist)
+            submission_writer.write(playlist)
 
 
 class MostPopular(Recommender):
@@ -30,7 +38,6 @@ class MostPopular(Recommender):
     def __init__(self, dataset, dry=True):
         super().__init__(dataset, dry)
 
-    def run(self, submission_path):
         # Count the items
         items_count = {}
 
@@ -41,93 +48,92 @@ class MostPopular(Recommender):
                 else:
                     items_count[item] = 1
 
-        items_sorted = sorted(items_count, key=items_count.get, reverse=True)
+        self.items_sorted = sorted(items_count, key=items_count.get, reverse=True)
 
-        # Create the submission
-        submission_writer = self.dataset.writer(submission_path)
+    def recommend(self, playlist):
+        items = []
+        count = 0
 
-        for playlist in self.dataset.reader(self.test_playlists, self.test_items):
-            items = []
-            count = 0
+        for item in self.items_sorted:
+            if item not in playlist['items']:
+                items.append(item)
+                count += 1
+            if count >= 500:
+                break
 
-            for item in items_sorted:
-                if item not in playlist['items']:
-                    items.append(item)
-                    count += 1
-                if count >= 500:
-                    break
-
-            playlist['items'] = items
-            submission_writer.write(playlist)
+        playlist['items'] = items
 
 
 class Random(Recommender):
 
     def __init__(self, dataset, dry=True, weighted=False):
         super().__init__(dataset, dry)
-        self.weighted = weighted
 
-    def run(self, submission_path):
         # Load the items
-        items_training = []
+        self.items_training = []
 
         for playlist in self.dataset.reader(self.train_playlists, self.train_items):
             for item in playlist['items']:
-                items_training.append(item)
+                self.items_training.append(item)
 
-        if self.weighted is False:
-            items_training = list(set(items_training))
+        if weighted is False:
+            self.items_training = list(set(self.items_training))
 
-        # Create the submission
-        submission_writer = self.dataset.writer(submission_path)
+    def recommend(self, playlist):
+        items = []
 
-        for playlist in self.dataset.reader(self.test_playlists, self.test_items):
-            items = []
+        while len(items) < 500:
+            item = random.choice(self.items_training)
+            if item not in playlist['items'] and item not in items:
+                items.append(item)
 
-            while len(items) < 500:
-                item = random.choice(items_training)
-                if item not in playlist['items'] and item not in items:
-                    items.append(item)
-
-            playlist['items'] = items
-            submission_writer.write(playlist)
+        playlist['items'] = items
 
 
-# TODO
-class Word2Rec:
+class Word2Rec(Recommender):
 
-    def __init__(self, dataset, model_file):
+    class MySentence:
 
-        self.dataset = dataset
+        def __init__(self, dataset, train_playlists, train_items):
+            self.dataset = dataset
+            self.train_playlists = train_playlists
+            self.train_items = train_items
 
-        model = Word2Vec.load(model_file)
+        def __iter__(self):
+            for playlist in self.dataset.reader(self.train_playlists, self.train_items):
+                # Convert IDs to strings
+                sentence = list(map(lambda x: str(x), playlist['items']))
+
+                yield sentence
+
+    def __init__(self, dataset, dry=True, model_file=None, fallback=MostPopular):
+        super().__init__(dataset, dry)
+        self.fallback = fallback(dataset, dry)
+
+        if os.path.isfile(model_file):
+            # Load the model
+            model = Word2Vec.load(model_file)
+        else:
+            # Train the model
+            sentences = self.MySentence(self.dataset, self.train_playlists, self.train_items)
+            model = Word2Vec(sentences, workers=4, min_count=0)
+
+            # Save the model
+            if model_file is not None:
+                model.save(model_file)
 
         self.model = model.wv
-
         del model
 
-    def run(self, submission_path):
+    def recommend(self, playlist):
+        seeds = list(map(lambda x: str(x), playlist['items']))
 
-        # Create the submission
-
-        submission_writer = self.dataset.writer(submission_path)
-
-        for playlist in self.dataset.reader('playlists_test.csv', 'items_test_x.csv'):
-
-            seeds = list(map(lambda x: str(x), playlist['items']))
-
-            length_seeds = len(seeds)
-
-            n = 500 - length_seeds
-
+        if len(seeds) > 0:
+            n = 500 - len(seeds)
             max_num_seed = 100
-
-            predictions_and_seeds = self.model.most_similar(positive=seeds, topn=n+max_num_seed)
-
-            predictions_and_seeds = [p for (p,s) in predictions_and_seeds]
-
+            predictions_and_seeds = self.model.most_similar(positive=seeds, topn=n + max_num_seed)
+            predictions_and_seeds = [p for (p, s) in predictions_and_seeds]
             predictions = [p for p in predictions_and_seeds if p not in seeds][0:500]
-
-            playlist['items'] = list(map(lambda x: int(x), predictions)) 
-
-            submission_writer.write(playlist)
+            playlist['items'] = list(map(lambda x: int(x), predictions))
+        else:
+            self.fallback.recommend(playlist)
