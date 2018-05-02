@@ -74,9 +74,10 @@ class Dataset:
                                     'items': []}
                 yield current_playlist
 
-    def writer(self, submission_path):
+    def writer(self, submission_path, main=True):
         """
         :param submission_path: The file in which save the submission.
+        :param main: If the track is main or creative.
         """
         class DatasetWriter:
 
@@ -84,6 +85,12 @@ class Dataset:
                 self.tracks_id2uri = tracks_id2uri
                 self.file = open(file_path, 'w', newline='', encoding='utf8')
                 self.writer = csv.writer(self.file)
+
+                if main is True:
+                    row = ['team_info', 'D2KLab', 'main', 'diego.monti@polito.it']
+                else:
+                    row = ['team_info', 'D2KLab', 'creative', 'diego.monti@polito.it']
+                self.writer.writerow(row)
 
             def __del__(self):
                 self.file.close()

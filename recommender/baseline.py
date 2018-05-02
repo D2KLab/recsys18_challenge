@@ -1,16 +1,40 @@
 import random
 from gensim.models import Word2Vec
 
-class MostPopular:
 
-    def __init__(self, dataset):
+class Recommender:
+
+    def __init__(self, dataset, dry=True):
+        """
+        :param dataset: An instance of the helper class for reading and writing the dataset.
+        :param dry: If true the recommender will use the internal dataset instead of the official one.
+        """
         self.dataset = dataset
+        if dry is True:
+            self.train_playlists = 'playlists_training_validation.csv'
+            self.train_items = 'items_training_validation.csv'
+            self.test_playlists = 'playlists_test.csv'
+            self.test_items = 'items_test_x.csv'
+        else:
+            self.train_playlists = 'playlists.csv'
+            self.train_items = 'items.csv'
+            self.test_playlists = 'playlists_challenge.csv'
+            self.test_items = 'items_challenge.csv'
+
+    def run(self, submission_path):
+        raise NotImplementedError
+
+
+class MostPopular(Recommender):
+
+    def __init__(self, dataset, dry=True):
+        super().__init__(dataset, dry)
 
     def run(self, submission_path):
         # Count the items
         items_count = {}
 
-        for playlist in self.dataset.reader('playlists_training_validation.csv', 'items_training_validation.csv'):
+        for playlist in self.dataset.reader(self.train_playlists, self.train_items):
             for item in playlist['items']:
                 if item in items_count:
                     items_count[item] += 1
@@ -22,7 +46,7 @@ class MostPopular:
         # Create the submission
         submission_writer = self.dataset.writer(submission_path)
 
-        for playlist in self.dataset.reader('playlists_test.csv', 'items_test_x.csv'):
+        for playlist in self.dataset.reader(self.test_playlists, self.test_items):
             items = []
             count = 0
 
@@ -37,17 +61,17 @@ class MostPopular:
             submission_writer.write(playlist)
 
 
-class Random:
+class Random(Recommender):
 
-    def __init__(self, dataset, weighted=False):
-        self.dataset = dataset
+    def __init__(self, dataset, dry=True, weighted=False):
+        super().__init__(dataset, dry)
         self.weighted = weighted
 
     def run(self, submission_path):
         # Load the items
         items_training = []
 
-        for playlist in self.dataset.reader('playlists_training_validation.csv', 'items_training_validation.csv'):
+        for playlist in self.dataset.reader(self.train_playlists, self.train_items):
             for item in playlist['items']:
                 items_training.append(item)
 
@@ -57,7 +81,7 @@ class Random:
         # Create the submission
         submission_writer = self.dataset.writer(submission_path)
 
-        for playlist in self.dataset.reader('playlists_test.csv', 'items_test_x.csv'):
+        for playlist in self.dataset.reader(self.test_playlists, self.test_items):
             items = []
 
             while len(items) < 500:
@@ -69,6 +93,7 @@ class Random:
             submission_writer.write(playlist)
 
 
+# TODO
 class Word2Rec:
 
     def __init__(self, dataset, model_file):
@@ -88,10 +113,6 @@ class Word2Rec:
         submission_writer = self.dataset.writer(submission_path)
 
         for playlist in self.dataset.reader('playlists_test.csv', 'items_test_x.csv'):
-
-            items = []
-
-            count = 0
 
             seeds = list(map(lambda x: str(x), playlist['items']))
 
