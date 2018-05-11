@@ -20,8 +20,8 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import os
 import tensorflow as tf
+
 
 def _read_items(filename, dataset):
 
@@ -32,8 +32,6 @@ def _read_items(filename, dataset):
         items = items + list(map(lambda x : str(x), playlist['items']))
 
         items.append('<eos>')
-
-    print(items)
 
     return items
 
@@ -51,7 +49,7 @@ def _build_vocab(filename, dataset):
     return item_to_id
 
 
-def _file_to_word_ids(filename, word_to_id):
+def _file_to_word_ids(filename, dataset, word_to_id):
 
     data = _read_items(filename, dataset)
     return [word_to_id[word] for word in data if word in word_to_id]
@@ -72,9 +70,9 @@ def read_raw_data(dataset=None):
     """
 
     word_to_id = _build_vocab("training", dataset)
-    train_data = _file_to_word_ids("training", word_to_id)
-    valid_data = _file_to_word_ids("validation", word_to_id)
-    test_data = _file_to_word_ids("test", word_to_id)
+    train_data = _file_to_word_ids("training", dataset, word_to_id)
+    valid_data = _file_to_word_ids("validation", dataset, word_to_id)
+    test_data = _file_to_word_ids("test", dataset, word_to_id)
     vocabulary = len(word_to_id)
     return train_data, valid_data, test_data, vocabulary
 
