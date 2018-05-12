@@ -1,1 +1,4 @@
+numpy
 gensim
+emot
+pyfasttext
