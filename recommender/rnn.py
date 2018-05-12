@@ -61,6 +61,7 @@ from tensorflow.python.client import device_lib
 import sys
 sys.path.append('.')
 from utils.dataset import Dataset
+from gensim.models import Word2Vec
 
 flags = tf.flags
 logging = tf.logging
@@ -82,6 +83,8 @@ flags.DEFINE_string("rnn_mode", None,
                     "The low level implementation of lstm cell: one of CUDNN, "
                     "BASIC, and BLOCK, representing cudnn_lstm, basic_lstm, "
                     "and lstm_block_cell classes.")
+flags.DEFINE_bool("one_hot", False, "Using one-hot encoding vs word2vec models")
+
 FLAGS = flags.FLAGS
 BASIC = "basic"
 CUDNN = "cudnn"
@@ -106,20 +109,43 @@ class PTBInput(object):
 class PTBModel(object):
     """The PTB model."""
 
-    def __init__(self, is_training, config, input_):
+    def __init__(self, is_training, config, input_, vocab_size, one_hot=False):
         self._is_training = is_training
         self._input = input_
         self._rnn_params = None
         self._cell = None
         self.batch_size = input_.batch_size
         self.num_steps = input_.num_steps
+        self.one_hot = one_hot
         size = config.hidden_size
-        vocab_size = config.vocab_size
+        vocab_size = vocab_size
 
         with tf.device("/cpu:0"):
-            embedding = tf.get_variable(
-                "embedding", [vocab_size, size], dtype=data_type())
-            inputs = tf.nn.embedding_lookup(embedding, input_.input_data)
+
+            if self.one_hot:
+
+                embedding = tf.get_variable(
+                    "embedding", [vocab_size, size], dtype=data_type())
+
+                inputs = tf.nn.embedding_lookup(embedding, input_.input_data)
+
+            else:
+
+                w2v_track_model = Word2Vec.load('models/training_debug.w2v')
+
+                w2v_track_vectors = w2v_track_model.wv.vectors
+
+                w2v_weights_initializer = tf.constant_initializer(w2v_track_vectors)
+
+                embedding = tf.get_variable(
+                    name='embedding',
+                    shape=(vocab_size, size),
+                    initializer=w2v_weights_initializer,
+                    trainable=False)
+
+                #TODO: read emb for albums and artists and concatenate them
+
+                inputs = tf.nn.embedding_lookup(embedding, input_.input_data)
 
         if is_training and config.keep_prob < 1:
             inputs = tf.nn.dropout(inputs, config.keep_prob)
@@ -315,7 +341,6 @@ class SmallConfig(object):
     keep_prob = 1.0
     lr_decay = 0.5
     batch_size = 20
-    vocab_size = 10000
     rnn_mode = BLOCK
 
 
@@ -332,7 +357,6 @@ class MediumConfig(object):
     keep_prob = 0.5
     lr_decay = 0.8
     batch_size = 20
-    vocab_size = 10000
     rnn_mode = BLOCK
 
 
@@ -349,7 +373,6 @@ class LargeConfig(object):
     keep_prob = 0.35
     lr_decay = 1 / 1.15
     batch_size = 20
-    vocab_size = 10000
     rnn_mode = BLOCK
 
 
@@ -366,7 +389,6 @@ class TestConfig(object):
     keep_prob = 1.0
     lr_decay = 0.5
     batch_size = 20
-    vocab_size = 10000
     rnn_mode = BLOCK
 
 
@@ -443,6 +465,11 @@ def main(_):
     raw_data = reader.read_raw_data(dataset)
     train_data, valid_data, test_data, _ = raw_data
 
+    all_data = (set(train_data).union(set(valid_data))).union(test_data)
+
+    voc_size = len(list(all_data))
+
+    print(voc_size)
     config = get_config()
     eval_config = get_config()
     eval_config.batch_size = 1
@@ -455,14 +482,14 @@ def main(_):
         with tf.name_scope("Train"):
             train_input = PTBInput(config=config, data=train_data, name="TrainInput")
             with tf.variable_scope("Model", reuse=None, initializer=initializer):
-                m = PTBModel(is_training=True, config=config, input_=train_input)
+                m = PTBModel(is_training=True, config=config, input_=train_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
             tf.summary.scalar("Training Loss", m.cost)
             tf.summary.scalar("Learning Rate", m.lr)
 
         with tf.name_scope("Valid"):
             valid_input = PTBInput(config=config, data=valid_data, name="ValidInput")
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
-                mvalid = PTBModel(is_training=False, config=config, input_=valid_input)
+                mvalid = PTBModel(is_training=False, config=config, input_=valid_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
             tf.summary.scalar("Validation Loss", mvalid.cost)
 
         with tf.name_scope("Test"):
@@ -470,7 +497,7 @@ def main(_):
                 config=eval_config, data=test_data, name="TestInput")
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
                 mtest = PTBModel(is_training=False, config=eval_config,
-                                 input_=test_input)
+                                 input_=test_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
 
         models = {"Train": m, "Valid": mvalid, "Test": mtest}
         for name, model in models.items():
