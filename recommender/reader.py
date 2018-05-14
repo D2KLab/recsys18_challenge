@@ -28,9 +28,9 @@ def _read_items(filename, dataset):
 
     items = []
 
-    for i, playlist in enumerate(dataset.reader('playlists_%s.csv' %filename, 'items_%s.csv' %filename)):
+    for i, playlist in enumerate(dataset.reader('playlists_%s.csv' % filename, 'items_%s.csv' % filename)):
 
-        items = items + list(map(lambda x : str(x), playlist['items']))
+        items = items + list(map(lambda x: str(x), playlist['items']))
 
         items.append('<eos>')
 
@@ -42,7 +42,7 @@ def _read_items(filename, dataset):
 def _build_vocab(data):
 
     items = list(set(data))
-    item_to_id = {item:i for i, item in enumerate(items)}
+    item_to_id = {item: i for i, item in enumerate(items)}
 
     return item_to_id
 

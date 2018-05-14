@@ -97,20 +97,22 @@ class Random(Recommender):
 class Word2Rec(Recommender):
     class MySentence:
 
-        def __init__(self, dataset, train_playlists, train_items):
+        def __init__(self, dataset, train_playlists, train_items, mode="items"):
             self.dataset = dataset
             self.train_playlists = train_playlists
             self.train_items = train_items
+            self.mode = mode
 
         def __iter__(self):
             for playlist in self.dataset.reader(self.train_playlists, self.train_items):
                 # Convert IDs to strings
-                sentence = list(map(lambda x: str(x), playlist['items']))
+                sentence = list(map(lambda x: str(x), playlist[self.mode]))
 
                 yield sentence
 
-    def __init__(self, dataset, dry=True, model_file=None, fallback=MostPopular):
+    def __init__(self, dataset, dry=True, model_file=None, mode="items", fallback=MostPopular):
         super().__init__(dataset, dry)
+        self.mode = mode
         self.fallback = fallback(dataset, dry)
 
         if os.path.isfile(model_file):
@@ -129,7 +131,7 @@ class Word2Rec(Recommender):
         del model
 
     def recommend(self, playlist):
-        seeds = list(map(lambda x: str(x), playlist['items']))
+        seeds = list(map(lambda x: str(x), playlist[self.mode]))
 
         if len(seeds) > 0:
             n = 500 - len(seeds)
@@ -137,7 +139,7 @@ class Word2Rec(Recommender):
             predictions_and_seeds = self.model.most_similar(positive=seeds, topn=n + max_num_seed)
             predictions_and_seeds = [p for (p, s) in predictions_and_seeds]
             predictions = [p for p in predictions_and_seeds if p not in seeds][0:500]
-            playlist['items'] = list(map(lambda x: int(x), predictions))
+            playlist[self.mode] = list(map(lambda x: int(x), predictions))
         else:
             self.fallback.recommend(playlist)
 
