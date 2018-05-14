@@ -131,7 +131,8 @@ class PTBModel(object):
 
             else:
 
-                w2v_track_model = Word2Vec.load('models/training_debug.w2v')
+                w2v_track_model = Word2Vec.load('models/word2rec_dry.w2v')
+
 
                 w2v_track_vectors = w2v_track_model.wv.vectors
 
