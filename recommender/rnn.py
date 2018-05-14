@@ -450,6 +450,9 @@ def get_config():
 
 
 def main(_):
+
+    print('starting rnn...')
+
     if not FLAGS.data_path:
         raise ValueError("Must set --data_path to data directory")
     gpus = [
@@ -462,14 +465,19 @@ def main(_):
             % (len(gpus), FLAGS.num_gpus))
 
     dataset = Dataset(FLAGS.data_path)
+    print('initialized dataset')
 
     raw_data = reader.read_raw_data(dataset)
     train_data, valid_data, test_data, _ = raw_data
 
+    print('parsed data')
+
     all_data = (set(train_data).union(set(valid_data))).union(test_data)
 
-    voc_size = len(list(all_data))
+    print('defined all data')
 
+    voc_size = len(list(all_data))
+    print('defined vocabulary size')
     print(voc_size)
     config = get_config()
     eval_config = get_config()
