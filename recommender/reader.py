@@ -28,13 +28,13 @@ def _read_items(filename, dataset):
 
     items = []
 
-    item_to_id = {}
-
-    for playlist in dataset.reader('playlists_%s.csv' %filename, 'items_%s.csv' %filename):
+    for i, playlist in enumerate(dataset.reader('playlists_%s.csv' %filename, 'items_%s.csv' %filename)):
 
         items = items + list(map(lambda x : str(x), playlist['items']))
 
         items.append('<eos>')
+
+        print('read playlist %s: %d' % (filename, i))
 
     return items
 
