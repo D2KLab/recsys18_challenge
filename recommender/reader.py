@@ -21,11 +21,14 @@ from __future__ import print_function
 
 import collections
 import tensorflow as tf
+import time
 
 
 def _read_items(filename, dataset):
 
     items = []
+
+    item_to_id = {}
 
     for playlist in dataset.reader('playlists_%s.csv' %filename, 'items_%s.csv' %filename):
 
@@ -36,22 +39,16 @@ def _read_items(filename, dataset):
     return items
 
 
-def _build_vocab(filename, dataset):
+def _build_vocab(data):
 
-    data = _read_items(filename, dataset)
-
-    counter = collections.Counter(data)
-    count_pairs = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
-
-    items, _ = list(zip(*count_pairs))
-    item_to_id = dict(zip(items, range(len(items))))
+    items = list(set(data))
+    item_to_id = {item:i for i, item in enumerate(items)}
 
     return item_to_id
 
 
-def _file_to_word_ids(filename, dataset, word_to_id):
+def _file_to_word_ids(data, word_to_id):
 
-    data = _read_items(filename, dataset)
     return [word_to_id[word] for word in data if word in word_to_id]
 
 
@@ -68,12 +65,19 @@ def read_raw_data(dataset=None):
       tuple (train_data, valid_data, test_data, vocabulary)
       where each of the data objects can be passed to PTBIterator.
     """
+    print('reading training data')
+    train_data = _read_items("training", dataset)
+    word_to_id = _build_vocab(train_data)
+    train_data = _file_to_word_ids(train_data, word_to_id)
+    print('reading validation data')
+    valid_data = _read_items("validation", dataset)
+    valid_data = _file_to_word_ids(valid_data, word_to_id)
+    print('reading test data')
+    test_data = _read_items("test", dataset)
+    test_data = _file_to_word_ids(test_data, word_to_id)
 
-    word_to_id = _build_vocab("training", dataset)
-    train_data = _file_to_word_ids("training", dataset, word_to_id)
-    valid_data = _file_to_word_ids("validation", dataset, word_to_id)
-    test_data = _file_to_word_ids("test", dataset, word_to_id)
     vocabulary = len(word_to_id)
+
     return train_data, valid_data, test_data, vocabulary
 
 
