@@ -383,7 +383,7 @@ class TestConfig(object):
     max_grad_norm = 1
     num_layers = 1
     num_steps = 2
-    hidden_size = 2
+    hidden_size = 100
     max_epoch = 1
     max_max_epoch = 1
     keep_prob = 1.0
@@ -463,13 +463,8 @@ def main(_):
     dataset = Dataset(FLAGS.data_path)
 
     raw_data = reader.read_raw_data(dataset)
-    train_data, valid_data, test_data, _ = raw_data
+    train_data, valid_data, test_data, voc_size = raw_data
 
-    all_data = (set(train_data).union(set(valid_data))).union(test_data)
-
-    voc_size = len(list(all_data))
-
-    print(voc_size)
     config = get_config()
     eval_config = get_config()
     eval_config.batch_size = 1
