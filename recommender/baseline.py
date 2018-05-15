@@ -97,7 +97,7 @@ class Random(Recommender):
 class Word2Rec(Recommender):
     class MySentence:
 
-        def __init__(self, dataset, train_playlists, train_items, mode="items"):
+        def __init__(self, dataset, train_playlists, train_items, mode):
             self.dataset = dataset
             self.train_playlists = train_playlists
             self.train_items = train_items
@@ -110,7 +110,7 @@ class Word2Rec(Recommender):
 
                 yield sentence
 
-    def __init__(self, dataset, dry=True, model_file=None, mode="items", fallback=MostPopular):
+    def __init__(self, dataset, dry=True, model_file=None, mode="albums", fallback=MostPopular):
         super().__init__(dataset, dry)
         self.mode = mode
         self.fallback = fallback(dataset, dry)
@@ -120,7 +120,7 @@ class Word2Rec(Recommender):
             model = Word2Vec.load(model_file)
         else:
             # Train the model
-            sentences = self.MySentence(self.dataset, self.train_playlists, self.train_items)
+            sentences = self.MySentence(self.dataset, self.train_playlists, self.train_items, mode)
             model = Word2Vec(sentences, workers=4, min_count=0)
 
             # Save the model
