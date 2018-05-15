@@ -27,26 +27,13 @@ def _read_items(filename, dataset):
 
     for i, playlist in enumerate(dataset.reader('playlists_%s.csv' % filename, 'items_%s.csv' % filename)):
 
-        items.extend(map(lambda x: str(x), playlist['items']))
+        items.extend(playlist['items'])
 
-        items.append('<eos>')
+        items.append(0)  # index for <eos>
 
         print('read playlist %s: %d' % (filename, i))
 
     return items
-
-
-def _build_vocab(data):
-
-    items = list(set(data))
-    item_to_id = {item: i for i, item in enumerate(items)}
-
-    return item_to_id
-
-
-def _file_to_word_ids(data, word_to_id):
-
-    return [word_to_id[word] for word in data if word in word_to_id]
 
 
 def read_raw_data(dataset=None):
@@ -66,16 +53,12 @@ def read_raw_data(dataset=None):
 
     print('reading training data')
     train_data = _read_items("training", dataset)
-    word_to_id = _build_vocab(train_data)
-    train_data = _file_to_word_ids(train_data, word_to_id)
     print('reading validation data')
     valid_data = _read_items("validation", dataset)
-    valid_data = _file_to_word_ids(valid_data, word_to_id)
     print('reading test data')
     test_data = _read_items("test", dataset)
-    test_data = _file_to_word_ids(test_data, word_to_id)
 
-    vocabulary = len(word_to_id)
+    vocabulary = len(dataset.tracks_uri2id) + 1
 
     return train_data, valid_data, test_data, vocabulary
 
