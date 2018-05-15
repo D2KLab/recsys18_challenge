@@ -2,3 +2,4 @@ numpy
 gensim
 emot
 pyfasttext
+tensorflow

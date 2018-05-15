@@ -14,14 +14,11 @@
 # ==============================================================================
 
 
-"""Utilities for parsing PTB text files."""
+"""Utilities for parsing MPD files into arrays for the RNN"""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
-import collections
 import tensorflow as tf
-import time
 
 
 def _read_items(filename, dataset):
@@ -30,7 +27,7 @@ def _read_items(filename, dataset):
 
     for i, playlist in enumerate(dataset.reader('playlists_%s.csv' % filename, 'items_%s.csv' % filename)):
 
-        items = items + list(map(lambda x: str(x), playlist['items']))
+        items.extend(map(lambda x: str(x), playlist['items']))
 
         items.append('<eos>')
 
@@ -53,18 +50,20 @@ def _file_to_word_ids(data, word_to_id):
 
 
 def read_raw_data(dataset=None):
+
     """Load MPD dataset from data directory "data_path".
 
     pid,pos,track_id
 
     Args:
-      data_path: string path to the directory where simple-examples.tgz has
+      dataset: string path to the directory where simple-examples.tgz has
         been extracted.
 
     Returns:
       tuple (train_data, valid_data, test_data, vocabulary)
       where each of the data objects can be passed to PTBIterator.
     """
+
     print('reading training data')
     train_data = _read_items("training", dataset)
     word_to_id = _build_vocab(train_data)
