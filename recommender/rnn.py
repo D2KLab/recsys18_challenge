@@ -62,6 +62,8 @@ import sys
 sys.path.append('.')
 from utils.dataset import Dataset
 from gensim.models import Word2Vec
+import time
+import sys
 
 flags = tf.flags
 logging = tf.logging
@@ -133,7 +135,6 @@ class PTBModel(object):
 
                 w2v_track_model = Word2Vec.load('models/word2rec_dry.w2v')
 
-
                 w2v_track_vectors = w2v_track_model.wv.vectors
 
                 w2v_weights_initializer = tf.constant_initializer(w2v_track_vectors)
@@ -142,7 +143,7 @@ class PTBModel(object):
                     name='embedding',
                     shape=(vocab_size, size),
                     initializer=w2v_weights_initializer,
-                    trainable=False)
+                    trainable=False, dtype=data_type())
 
                 #TODO: read emb for albums and artists and concatenate them
 
@@ -392,7 +393,6 @@ class TestConfig(object):
     batch_size = 20
     rnn_mode = BLOCK
 
-
 def run_epoch(session, model, eval_op=None, verbose=False):
     """Runs the model on the given data."""
     start_time = time.time()
@@ -470,8 +470,6 @@ def main(_):
     raw_data = reader.read_raw_data(dataset)
     train_data, valid_data, test_data, voc_size = raw_data
 
-    print('parsed data')
-
     config = get_config()
     eval_config = get_config()
     eval_config.batch_size = 1
@@ -482,6 +480,7 @@ def main(_):
                                                     config.init_scale)
 
         with tf.name_scope("Train"):
+            print('model train')
             train_input = PTBInput(config=config, data=train_data, name="TrainInput")
             with tf.variable_scope("Model", reuse=None, initializer=initializer):
                 m = PTBModel(is_training=True, config=config, input_=train_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
@@ -489,12 +488,14 @@ def main(_):
             tf.summary.scalar("Learning Rate", m.lr)
 
         with tf.name_scope("Valid"):
+            print('model val')
             valid_input = PTBInput(config=config, data=valid_data, name="ValidInput")
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
                 mvalid = PTBModel(is_training=False, config=config, input_=valid_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
             tf.summary.scalar("Validation Loss", mvalid.cost)
 
         with tf.name_scope("Test"):
+            print('model test')
             test_input = PTBInput(
                 config=eval_config, data=test_data, name="TestInput")
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
