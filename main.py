@@ -8,10 +8,10 @@ from utils import sentence
 
 def run():
     parser = argparse.ArgumentParser(description='RecSys 2018 Challenge')
-    parser.add_argument('recommender', type=str, help='The recommandation algorithm')
-    parser.add_argument('output', type=str, help='The output file')
-    parser.add_argument('--dataset', type=str, default='dataset', help='The CSV dataset')
-    parser.add_argument('--dry', type=bool, default=True, help='If this is a dry run')
+    parser.add_argument('recommender', type=str, help='Recommandation algorithm')
+    parser.add_argument('output', type=str, help='Output file')
+    parser.add_argument('--dataset', type=str, default='dataset', help='Dataset path')
+    parser.add_argument('--no-dry', dest='dry', action='store_false', default=True, help='Real run')
     parser.add_argument('--w2r', type=str, default='models/w2r.bin', help='Word2Rec model')
     parser.add_argument('--pl', type=str, default='models/pl.bin', help='Playlist embeddings')
     parser.add_argument('--ft', type=str, default='models/ft.bin', help='FastText model')
