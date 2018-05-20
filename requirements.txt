@@ -2,4 +2,5 @@ numpy
 gensim
 emot
 pyfasttext
+sklearn
 tensorflow
