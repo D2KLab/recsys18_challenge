@@ -421,7 +421,7 @@ class TestConfig(object):
     learning_rate = 1.0
     max_grad_norm = 1
     num_layers = 1
-    num_steps = 2
+    num_steps = 5
     hidden_size = 9
     max_epoch = 1
     max_max_epoch = 1
@@ -584,7 +584,7 @@ def main(_):
 
     t_f = time.time()
 
-    print('Total time is %f' % (t - t_f))
+    print('Total time is %f' % (t_f - t))
 
 
 if __name__ == "__main__":
