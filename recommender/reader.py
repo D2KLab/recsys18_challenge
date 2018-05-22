@@ -21,13 +21,13 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-def _read_items(filename, dataset):
+def _read_items(filename, dataset, units='items'):
 
     items = []
 
     for i, playlist in enumerate(dataset.reader('playlists_%s.csv' % filename, 'items_%s.csv' % filename)):
 
-        items.extend(playlist['items'])
+        items.extend(playlist[units])
 
         items.append(0)  # index for <eos>
 
@@ -51,17 +51,28 @@ def read_raw_data(dataset=None):
       where each of the data objects can be passed to PTBIterator.
     """
 
+    train_data = {}
+    valid_data = {}
+    test_data = {}
+
     print('reading training data')
-    train_data = _read_items("training", dataset)
+    train_data['tracks'] = _read_items("training", dataset, units='items')
+    train_data['albums'] = _read_items("training", dataset, units='albums')
+    train_data['artists'] = _read_items("training", dataset, units='artists')
     print('reading validation data')
-    valid_data = _read_items("validation", dataset)
+    valid_data['tracks'] = _read_items("validation", dataset, units='items')
+    valid_data['albums'] = _read_items("validation", dataset, units='albums')
+    valid_data['artists'] = _read_items("validation", dataset, units='artists')
     print('reading test data')
-    test_data = _read_items("test", dataset)
+    test_data['tracks'] = _read_items("test", dataset, units='items')
+    test_data['albums'] = _read_items("test", dataset, units='albums')
+    test_data['artists'] = _read_items("test", dataset, units='artists')
 
     vocabulary = len(dataset.tracks_uri2id) + 1
 
-    return train_data, valid_data, test_data, vocabulary
+    assert len(train_data['tracks']) == len(train_data['albums']) == len(train_data['artists'])
 
+    return train_data, valid_data, test_data, vocabulary
 
 def ptb_producer(raw_data, batch_size, num_steps, name=None):
     """Iterate on the raw PTB data.
@@ -81,27 +92,55 @@ def ptb_producer(raw_data, batch_size, num_steps, name=None):
 
     Raises:
       tf.errors.InvalidArgumentError: if batch_size or num_steps are too high.
+    
     """
-    with tf.name_scope(name, "PTBProducer", [raw_data, batch_size, num_steps]):
-        raw_data = tf.convert_to_tensor(raw_data, name="raw_data", dtype=tf.int32)
 
-        data_len = tf.size(raw_data)
+    with tf.name_scope(name, "PTBProducer", [raw_data, batch_size, num_steps]):
+
+        raw_data_tracks = tf.convert_to_tensor(raw_data['tracks'], name="tracks", dtype=tf.int32)
+
+        data_len = tf.size(raw_data_tracks)
         batch_len = data_len // batch_size
-        data = tf.reshape(raw_data[0: batch_size * batch_len],
+        data_tracks = tf.reshape(raw_data_tracks[0: batch_size * batch_len],
                           [batch_size, batch_len])
 
         epoch_size = (batch_len - 1) // num_steps
         assertion = tf.assert_positive(
             epoch_size,
             message="epoch_size == 0, decrease batch_size or num_steps")
+
         with tf.control_dependencies([assertion]):
             epoch_size = tf.identity(epoch_size, name="epoch_size")
 
         i = tf.train.range_input_producer(epoch_size, shuffle=False).dequeue()
-        x = tf.strided_slice(data, [0, i * num_steps],
+
+        x_tracks = tf.strided_slice(data_tracks, [0, i * num_steps],
                              [batch_size, (i + 1) * num_steps])
-        x.set_shape([batch_size, num_steps])
-        y = tf.strided_slice(data, [0, i * num_steps + 1],
+
+        x_tracks.set_shape([batch_size, num_steps])
+
+        y = tf.strided_slice(data_tracks, [0, i * num_steps + 1],
                              [batch_size, (i + 1) * num_steps + 1])
         y.set_shape([batch_size, num_steps])
-        return x, y
+
+        raw_data_albums = tf.convert_to_tensor(raw_data['albums'], name="albums", dtype=tf.int32)
+
+        data_albums = tf.reshape(raw_data_albums[0: batch_size * batch_len],
+                          [batch_size, batch_len])
+
+        x_albums = tf.strided_slice(data_albums, [0, i * num_steps],
+                             [batch_size, (i + 1) * num_steps])
+
+        x_albums.set_shape([batch_size, num_steps])
+
+        raw_data_artists = tf.convert_to_tensor(raw_data['artists'], name="artists", dtype=tf.int32)
+
+        data_artists = tf.reshape(raw_data_artists[0: batch_size * batch_len],
+                          [batch_size, batch_len])
+
+        x_artists = tf.strided_slice(data_artists, [0, i * num_steps],
+                             [batch_size, (i + 1) * num_steps])
+
+        x_artists.set_shape([batch_size, num_steps])
+
+        return x_tracks, x_albums, x_artists, y
