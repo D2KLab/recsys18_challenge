@@ -62,6 +62,8 @@ import sys
 sys.path.append('.')
 from utils.dataset import Dataset
 from gensim.models import Word2Vec
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
 
 flags = tf.flags
 logging = tf.logging
@@ -470,6 +472,9 @@ def main(_):
     raw_data = reader.read_raw_data(dataset)
     train_data, valid_data, test_data, voc_size = raw_data
 
+    print('---------------')
+    print(len(train_data))
+    
     print('parsed data')
 
     config = get_config()
