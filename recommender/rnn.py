@@ -64,6 +64,7 @@ from utils.dataset import Dataset
 from gensim.models import Word2Vec
 import os
 os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
+import time
 
 flags = tf.flags
 logging = tf.logging
@@ -97,15 +98,50 @@ def data_type():
     return tf.float16 if FLAGS.use_fp16 else tf.float32
 
 
+def read_gensim_model(model, name, vocab_size, size, input_data):
+
+    w2v_track_model = Word2Vec.load(model)
+
+    assert size % 3 == 0, 'hidden size must be multiple of 3 to use tracks, albums and artists'
+
+    s = int(size / 3)
+
+    w2v_track_vectors = w2v_track_model.wv.vectors[:, 0:s]
+
+    del w2v_track_model
+
+    w2v_weights_initializer = tf.constant_initializer(w2v_track_vectors)
+
+    embedding = tf.get_variable(
+        name=name,
+        shape=(vocab_size, s),
+        initializer=w2v_weights_initializer,
+        trainable=False, dtype=data_type())
+
+    inputs = tf.nn.embedding_lookup(embedding, input_data)
+
+    return inputs
+
+
 class PTBInput(object):
     """The input data."""
 
     def __init__(self, config, data, name=None):
         self.batch_size = batch_size = config.batch_size
         self.num_steps = num_steps = config.num_steps
-        self.epoch_size = ((len(data) // batch_size) - 1) // num_steps
-        self.input_data, self.targets = reader.ptb_producer(
-            data, batch_size, num_steps, name=name)
+
+        self.epoch_size = ((len(data['tracks']) // batch_size) - 1) // num_steps
+
+        assert self.epoch_size > 0, 'Epoch size cannot be negative'
+
+        self.input_data = {}
+
+        tracks, albums, artists, self.targets = reader.ptb_producer(data,
+                                      batch_size, num_steps, name=name)
+
+        self.input_data['tracks'] = tracks
+        self.input_data['albums'] = albums
+        self.input_data['artists'] = artists
 
 
 class PTBModel(object):
@@ -129,26 +165,28 @@ class PTBModel(object):
                 embedding = tf.get_variable(
                     "embedding", [vocab_size, size], dtype=data_type())
 
-                inputs = tf.nn.embedding_lookup(embedding, input_.input_data)
+                inputs = tf.nn.embedding_lookup(embedding, input_.input_data['tracks'])
 
             else:
 
-                w2v_track_model = Word2Vec.load('models/word2rec_dry.w2v')
+                input_tracks_data = input_.input_data['tracks']
 
+                input_albums_data = input_.input_data['albums']
 
-                w2v_track_vectors = w2v_track_model.wv.vectors
+                inputs_artists_data = input_.input_data['artists']
 
-                w2v_weights_initializer = tf.constant_initializer(w2v_track_vectors)
+                inputs_tracks = read_gensim_model('models/word2rec_dry.w2v', 'embedding_tracks',
+                                                  vocab_size, size, input_tracks_data)
 
-                embedding = tf.get_variable(
-                    name='embedding',
-                    shape=(vocab_size, size),
-                    initializer=w2v_weights_initializer,
-                    trainable=False)
+                inputs_albums = read_gensim_model('models/word2rec_dry_albums.w2v', 'embedding_albums',
+                                                  vocab_size, size, input_albums_data)
 
-                #TODO: read emb for albums and artists and concatenate them
+                inputs_artists = read_gensim_model('models/word2rec_dry_artists.w2v', 'embedding_artists',
+                                                   vocab_size, size, inputs_artists_data)
 
-                inputs = tf.nn.embedding_lookup(embedding, input_.input_data)
+                inputs = tf.concat([inputs_tracks, inputs_albums, inputs_artists], 2)
+
+            print(inputs.shape)
 
         if is_training and config.keep_prob < 1:
             inputs = tf.nn.dropout(inputs, config.keep_prob)
@@ -385,8 +423,8 @@ class TestConfig(object):
     learning_rate = 1.0
     max_grad_norm = 1
     num_layers = 1
-    num_steps = 2
-    hidden_size = 100
+    num_steps = 5
+    hidden_size = 9
     max_epoch = 1
     max_max_epoch = 1
     keep_prob = 1.0
@@ -400,12 +438,14 @@ def run_epoch(session, model, eval_op=None, verbose=False):
     start_time = time.time()
     costs = 0.0
     iters = 0
+
     state = session.run(model.initial_state)
 
     fetches = {
         "cost": model.cost,
         "final_state": model.final_state,
     }
+
     if eval_op is not None:
         fetches["eval_op"] = eval_op
 
@@ -416,7 +456,9 @@ def run_epoch(session, model, eval_op=None, verbose=False):
             feed_dict[h] = state[i].h
 
         vals = session.run(fetches, feed_dict)
+
         cost = vals["cost"]
+
         state = vals["final_state"]
 
         costs += cost
@@ -452,8 +494,8 @@ def get_config():
 
 
 def main(_):
-
-    print('starting rnn...')
+    t = time.time()
+    print('Starting rnn...')
 
     if not FLAGS.data_path:
         raise ValueError("Must set --data_path to data directory")
@@ -473,7 +515,6 @@ def main(_):
     train_data, valid_data, test_data, voc_size = raw_data
 
     print('---------------')
-    print(len(train_data))
     
     print('parsed data')
 
@@ -487,19 +528,23 @@ def main(_):
                                                     config.init_scale)
 
         with tf.name_scope("Train"):
+            print('model train')
             train_input = PTBInput(config=config, data=train_data, name="TrainInput")
             with tf.variable_scope("Model", reuse=None, initializer=initializer):
                 m = PTBModel(is_training=True, config=config, input_=train_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
+
             tf.summary.scalar("Training Loss", m.cost)
             tf.summary.scalar("Learning Rate", m.lr)
 
         with tf.name_scope("Valid"):
+            print('model val')
             valid_input = PTBInput(config=config, data=valid_data, name="ValidInput")
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
                 mvalid = PTBModel(is_training=False, config=config, input_=valid_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
             tf.summary.scalar("Validation Loss", mvalid.cost)
 
         with tf.name_scope("Test"):
+            print('model test')
             test_input = PTBInput(
                 config=eval_config, data=test_data, name="TestInput")
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
@@ -542,6 +587,10 @@ def main(_):
             if FLAGS.save_path:
                 print("Saving model to %s." % FLAGS.save_path)
                 sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
+
+    t_f = time.time()
+
+    print('Total time is %f' % (t_f - t))
 
 
 if __name__ == "__main__":
