@@ -19,6 +19,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import tensorflow as tf
+import numpy as np
 
 
 def _read_items(filename, dataset, units='items'):
@@ -74,8 +75,9 @@ def read_raw_data(dataset=None):
 
     return train_data, valid_data, test_data, vocabulary
 
+"""
 def ptb_producer(raw_data, batch_size, num_steps, name=None):
-    """Iterate on the raw PTB data.
+    Iterate on the raw PTB data.
 
     This chunks up raw_data into batches of examples and returns Tensors that
     are drawn from these batches.
@@ -93,7 +95,7 @@ def ptb_producer(raw_data, batch_size, num_steps, name=None):
     Raises:
       tf.errors.InvalidArgumentError: if batch_size or num_steps are too high.
     
-    """
+   
 
     with tf.name_scope(name, "PTBProducer", [raw_data, batch_size, num_steps]):
 
@@ -144,3 +146,50 @@ def ptb_producer(raw_data, batch_size, num_steps, name=None):
         x_artists.set_shape([batch_size, num_steps])
 
         return x_tracks, x_albums, x_artists, y
+"""
+
+def ptb_iterator(raw_data, batch_size, num_steps):
+
+    """Iterate on the raw PTB data.
+    This generates batch_size pointers into the raw PTB data, and allows
+    minibatch iteration along these pointers.
+    Args:
+      raw_data: one of the raw data outputs from ptb_raw_data.
+      batch_size: int, the batch size.
+      num_steps: int, the number of unrolls.
+    Yields:
+      Pairs of the batched data, each a matrix of shape [batch_size, num_steps].
+      The second element of the tuple is the same data time-shifted to the
+      right by one.
+    Raises:
+      ValueError: if batch_size or num_steps are too high.
+    """
+
+    raw_data_tracks = np.array(raw_data['tracks'], dtype=np.int32)
+    raw_data_albums = np.array(raw_data['albums'], dtype=np.int32)
+    raw_data_artists = np.array(raw_data['artists'], dtype=np.int32)
+
+    data_len = len(raw_data_tracks)
+    batch_len = data_len // batch_size
+
+    data_tracks = np.zeros([batch_size, batch_len], dtype=np.int32)
+    data_albums = np.zeros([batch_size, batch_len], dtype=np.int32)
+    data_artists = np.zeros([batch_size, batch_len], dtype=np.int32)
+
+    for i in range(batch_size):
+        data_tracks[i] = raw_data_tracks[batch_len * i:batch_len * (i + 1)]
+        data_albums[i] = raw_data_albums[batch_len * i:batch_len * (i + 1)]
+        data_artists[i] = raw_data_artists[batch_len * i:batch_len * (i + 1)]
+
+    epoch_size = (batch_len - 1) // num_steps
+
+    if epoch_size == 0:
+        raise ValueError("epoch_size == 0, decrease batch_size or num_steps")
+
+    for i in range(epoch_size):
+        x_tracks = data_tracks[:, i * num_steps:(i + 1) * num_steps]
+        x_albums = data_albums[:, i * num_steps:(i + 1) * num_steps]
+        x_artists = data_artists[:, i * num_steps:(i + 1) * num_steps]
+        y = data_tracks[:, i * num_steps + 1:(i + 1) * num_steps + 1]
+
+        yield (x_tracks, x_albums, x_artists, y)
