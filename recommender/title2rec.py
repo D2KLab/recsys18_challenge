@@ -1,30 +1,31 @@
 import os
 import re
+from pyfasttext import FastText
 
 import emot
 import numpy as np
 from gensim.models import Word2Vec, KeyedVectors
-from pyfasttext import FastText
 from sklearn.cluster import KMeans
 
 from utils import sentence
 from ._recommender import AbstractRecommender
-from .baseline import MostPopular, Word2Rec
+from .baseline import Word2Rec
 
 
 class Title2Rec(AbstractRecommender):
 
     def __init__(self, dataset, dry=True, w2rmodel_file=None, pl_model_file=None, ft_model_file=None,
-                 ft_vec_file=None, cluster_file=None, num_clusters=100, fallback=MostPopular):
+                 ft_vec_file=None, cluster_file=None, num_clusters=100):
         super().__init__(dataset, dry=dry)
-        self.fallback = fallback(dataset, dry=dry)
 
         if os.path.isfile(ft_model_file):
             self.ft_model = FastText(ft_model_file)
         else:
             self.num_clusters = num_clusters
             self.playlists = self.dataset.reader(self.test_playlists, self.test_items)
-            self.w2rmodel = self.get_w2r(dataset, dry, w2rmodel_file, fallback)
+            self.playlists = list(filter(lambda p: len(p['items']) > 0, self.playlists))
+
+            self.w2rmodel = self.get_w2r(dataset, dry, w2rmodel_file)
             self.pl_embs = self.compute_pl_embs(pl_model_file)
             self.clusters = self.compute_clusters(cluster_file, self.pl_embs, num_clusters)
             self.ft_model = self.compute_fasttext(ft_model_file)
@@ -38,21 +39,20 @@ class Title2Rec(AbstractRecommender):
 
         self.pl_vec = KeyedVectors.load_word2vec_format(ft_vec_file, binary=False)
 
-    def get_w2r(self, dataset, dry, model_file, fallback):
+    def get_w2r(self, dataset, dry, model_file):
         if os.path.isfile(model_file):
             # Load the model
             model = Word2Vec.load(model_file)
             return model.wv
         else:
             # Train the model
-            w2r = Word2Rec(dataset, dry=dry, model_file=model_file, mode=sentence.Mode.ITEM, fallback=fallback)
+            w2r = Word2Rec(dataset, dry=dry, model_file=model_file, mode=sentence.Mode.ITEM)
             return w2r.model
 
     def compute_fasttext(self, ft_model_file):
-
-        documents = [[process_title(pl['title']).strip() for pl in self.playlists[self.clusters == i]]
+        documents = [[process_title(pl['title']).strip() for pl in np.array(self.playlists)[self.clusters == i]]
                      for i in np.arange(self.num_clusters)]
-        doc_file = 'documents.txt'
+        doc_file = 'models/documents.txt'
         np.savetxt(doc_file, [' '.join(d) for d in documents], fmt='%s')
         model = FastText()
         model.skipgram(input=doc_file, output=ft_model_file, epoch=100, lr=0.7)
@@ -71,7 +71,7 @@ class Title2Rec(AbstractRecommender):
             return _embs
 
     def get_vector_from_w2r(self, playlist):
-        _item_embs = map(lambda track_id: self.w2rmodel[str(track_id)], playlist['items'])
+        _item_embs = list(map(lambda track_id: self.w2rmodel[str(track_id)], playlist['items']))
         return np.array(_item_embs).mean(axis=0)
 
     def compute_clusters(self, cluster_file, pl_embs, num_clusters=100):
@@ -98,7 +98,7 @@ class Title2Rec(AbstractRecommender):
         most_similar_vec = self.pl_vec.most_similar(positive=[this_vec], topn=n_pl)
         most_similar_pl = self.playlists[[v[0] for v in most_similar_vec]]
         predictions_and_seeds = [pl['items'] for pl in most_similar_pl]
-        predictions_and_seeds = [item for sublist in predictions_and_seeds for item in sublist] # flatten
+        predictions_and_seeds = [item for sublist in predictions_and_seeds for item in sublist]  # flatten
         predictions = [p for p in predictions_and_seeds if p not in seeds]
         predictions = sorted(set(predictions), key=predictions.count, reverse=True)[0:n]
         playlist['items'] = list(map(lambda x: int(x), predictions))
