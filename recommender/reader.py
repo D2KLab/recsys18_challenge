@@ -75,9 +75,9 @@ def read_raw_data(dataset=None):
 
     return train_data, valid_data, test_data, vocabulary
 
-"""
+
 def ptb_producer(raw_data, batch_size, num_steps, name=None):
-    Iterate on the raw PTB data.
+    """Iterate on the raw PTB data.
 
     This chunks up raw_data into batches of examples and returns Tensors that
     are drawn from these batches.
@@ -94,8 +94,8 @@ def ptb_producer(raw_data, batch_size, num_steps, name=None):
 
     Raises:
       tf.errors.InvalidArgumentError: if batch_size or num_steps are too high.
-    
-   
+
+    """
 
     with tf.name_scope(name, "PTBProducer", [raw_data, batch_size, num_steps]):
 
@@ -146,11 +146,11 @@ def ptb_producer(raw_data, batch_size, num_steps, name=None):
         x_artists.set_shape([batch_size, num_steps])
 
         return x_tracks, x_albums, x_artists, y
-"""
 
-def ptb_iterator(raw_data, batch_size, num_steps):
 
-    """Iterate on the raw PTB data.
+"""def ptb_iterator(raw_data, batch_size, num_steps):
+    
+    Iterate on the raw PTB data.
     This generates batch_size pointers into the raw PTB data, and allows
     minibatch iteration along these pointers.
     Args:
@@ -163,7 +163,7 @@ def ptb_iterator(raw_data, batch_size, num_steps):
       right by one.
     Raises:
       ValueError: if batch_size or num_steps are too high.
-    """
+    
 
     raw_data_tracks = np.array(raw_data['tracks'], dtype=np.int32)
     raw_data_albums = np.array(raw_data['albums'], dtype=np.int32)
@@ -192,4 +192,4 @@ def ptb_iterator(raw_data, batch_size, num_steps):
         x_artists = data_artists[:, i * num_steps:(i + 1) * num_steps]
         y = data_tracks[:, i * num_steps + 1:(i + 1) * num_steps + 1]
 
-        yield (x_tracks, x_albums, x_artists, y)
+        yield (x_tracks, x_albums, x_artists, y) """
