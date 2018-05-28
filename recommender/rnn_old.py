@@ -107,9 +107,32 @@ def do_rank(session, model):
 
     state, predicts = session.run(fetches, feed_dict)
 
-    print(predicts)
-
     return predicts
+
+
+# TODO
+def do_sample(session, model, num_samples=500):
+
+    """Sampled from the model"""
+    samples = []
+    state = session.run(model.initial_state)
+    fetches = [model.final_state, model.sample]
+
+    for i in range(num_samples):
+
+        feed_dict = {}
+
+        for layer_num, (c, h) in enumerate(model.initial_state):
+            feed_dict[c] = state[layer_num].c
+            feed_dict[h] = state[layer_num].h
+
+        feed_dict[model.input] = PTBInput()
+
+        state, sample = session.run(fetches, feed_dict)
+
+        samples.append(sample[0][0])
+
+    return samples
 
 
 def data_type():
@@ -219,9 +242,9 @@ class PTBModel(object):
 
         logits_t = self.temperature(logits)
 
-        self.sample = tf.multinomial(logits_t, 1)  # this is our sampling operation
+        self._sample = tf.multinomial(logits_t, 1)  # this is our sampling operation
 
-        _, self._predictions = tf.nn.top_k(logits_t, 500)
+        self._logits_t, self._predictions = tf.nn.top_k(logits_t, 500)
 
         # Reshape logits to be a 3-D tensor for sequence loss
         logits = tf.reshape(logits, [self.batch_size, self.num_steps, vocab_size])
@@ -256,10 +279,7 @@ class PTBModel(object):
 
     def temperature(self, probs):
         # helper function to sample an index from a probability array
-        #preds = np.asarray(probs).astype('float64')
-
-        preds = probs ** (1 / self.T)
-        preds /= np.sum(preds)
+        preds = tf.pow(probs, (1 / self.T))
 
         return preds
 
@@ -337,8 +357,9 @@ class PTBModel(object):
         """Exports ops to collections."""
         self._name = name
         ops = {util.with_prefix(self._name, "cost"): self._cost,
-               util.with_prefix(self._name, "predictions"): self._predictions}
-        #ops.update(predictions=self._predictions)
+               util.with_prefix(self._name, "predictions"): self._predictions,
+               util.with_prefix(self._name, "logits_t"): self._logits_t,
+               util.with_prefix(self._name, "sample"): self._sample}
         if self._is_training:
             ops.update(lr=self._lr, new_lr=self._new_lr, lr_update=self._lr_update)
             if self._rnn_params:
@@ -349,7 +370,6 @@ class PTBModel(object):
         self._final_state_name = util.with_prefix(self._name, "final")
         util.export_state_tuples(self._initial_state, self._initial_state_name)
         util.export_state_tuples(self._final_state, self._final_state_name)
-        print(ops)
 
     def import_ops(self):
         """Imports ops from collections."""
@@ -369,13 +389,21 @@ class PTBModel(object):
                 tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, params_saveable)
         self._cost = tf.get_collection_ref(util.with_prefix(self._name, "cost"))[0]
         self._predictions = tf.get_collection_ref(util.with_prefix(self._name, "predictions"))
+        self._logits_t = tf.get_collection_ref(util.with_prefix(self._name, "logits_t"))
+        self._sample = tf.get_collection_ref(util.with_prefix(self._name, "sample"))
         num_replicas = FLAGS.num_gpus if self._name == "Train" else 1
         self._initial_state = util.import_state_tuples(
             self._initial_state, self._initial_state_name, num_replicas)
         self._final_state = util.import_state_tuples(
             self._final_state, self._final_state_name, num_replicas)
 
-        print(self.__dict__)
+    @property
+    def sample(self):
+        return self._sample
+
+    @property
+    def logits_t(self):
+        return self._logits_t
 
     @property
     def predictions(self):
@@ -477,38 +505,6 @@ class TestConfig(object):
     batch_size = 20
     rnn_mode = BLOCK
 
-"""
-def do_sample(session, model, data, num_samples):
-    Sampled from the model
-    samples = []
-    state = session.run(model.initial_state)
-    fetches = [model.final_state, model.sample]
-    sample = None
-    for x in data:
-    feed_dict = {}
-    feed_dict[model.input] = [[x]]
-        for layer_num, (c, h) in enumerate(model.initial_state):
-            feed_dict[c] = state[layer_num].c
-            feed_dict[h] = state[layer_num].h
-
-        state, sample = session.run(fetches, feed_dict)
-    if sample is not None:
-        samples.append(sample[0][0])
-    else:
-        samples.append(0)
-    k = 1
-    while k < num_samples:
-        feed_dict = {}
-        feed_dict[model.input] = [[samples[-1]]]
-        for layer_num, (c, h) in enumerate(model.initial_state):
-            feed_dict[c] = state[layer_num].c
-            feed_dict[h] = state[layer_num].h
-        state, sample = session.run(fetches, feed_dict)
-        samples.append(sample[0][0])
-        k += 1
-    return samples
-"""
-
 
 def run_epoch(session, model, eval_op=None, verbose=False):
     """Runs the model on the given data."""
@@ -520,7 +516,7 @@ def run_epoch(session, model, eval_op=None, verbose=False):
 
     fetches = {
         "cost": model.cost,
-        "final_state": model.final_state,
+        "final_state": model.final_state
     }
 
     if eval_op is not None:
@@ -660,8 +656,6 @@ def main(_):
             test_perplexity = run_epoch(session, mtest)
             print("Test Perplexity: %.3f" % test_perplexity)
 
-            #do_sample(session, mtest, test_input, 50)
-
             print(do_rank(session, mtest))
 
             if FLAGS.save_path:
@@ -703,10 +697,10 @@ def test():
 
         initializer = tf.random_uniform_initializer(-config.init_scale,
                                                     config.init_scale)
-        with tf.Session() as sess:
+        with tf.Session() as session:
 
             saver = tf.train.import_meta_graph('models/tensorflow/model.ckpt-1165.meta')
-            saver.restore(sess, tf.train.latest_checkpoint('models/tensorflow'))
+            saver.restore(session, tf.train.latest_checkpoint('models/tensorflow'))
 
             with tf.name_scope("Test"):
                 print('model test')
@@ -716,7 +710,7 @@ def test():
                     mtest = PTBModel(is_training=False, config=eval_config,
                                      input_=test_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
 
-                do_rank(sess, mtest, test_input)
+                    print(do_rank(session, mtest))
 
 
 if __name__ == "__main__":
