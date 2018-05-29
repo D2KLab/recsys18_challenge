@@ -9,21 +9,27 @@ from sklearn.cluster import KMeans
 
 from utils import sentence
 from ._recommender import AbstractRecommender
-from .baseline import Word2Rec
+from .baseline import Word2Rec, MostPopular
+
+
+def index(l, f):
+    return next((i for i in np.arange(len(l)) if f(l[i])), None)
 
 
 class Title2Rec(AbstractRecommender):
 
     def __init__(self, dataset, dry=True, w2rmodel_file=None, pl_model_file=None, ft_model_file=None,
-                 ft_vec_file=None, cluster_file=None, num_clusters=100):
+                 ft_vec_file=None, cluster_file=None, num_clusters=100, fallback=MostPopular):
         super().__init__(dataset, dry=dry)
+        self.playlists = self.dataset.reader(self.train_playlists, self.train_items)
+        self.playlists = np.array(list(filter(lambda p: p['title'] and len(p['items']) > 0, self.playlists)))
+
+        self.fallback = fallback(dataset, dry=dry)
 
         if os.path.isfile(ft_model_file):
             self.ft_model = FastText(ft_model_file)
         else:
             self.num_clusters = num_clusters
-            self.playlists = self.dataset.reader(self.test_playlists, self.test_items)
-            self.playlists = list(filter(lambda p: len(p['items']) > 0, self.playlists))
 
             self.w2rmodel = self.get_w2r(dataset, dry, w2rmodel_file)
             self.pl_embs = self.compute_pl_embs(pl_model_file)
@@ -31,7 +37,7 @@ class Title2Rec(AbstractRecommender):
             self.ft_model = self.compute_fasttext(ft_model_file)
 
         if not os.path.isfile(ft_vec_file):
-            self.title_vecs = [self.get_vector_from_title(pl['title']) for pl in self.playlists]
+            self.title_vecs = [self.get_vector_from_title(pl) for pl in self.playlists]
             with open(ft_vec_file, 'w') as file_handler:
                 file_handler.write('%d %d\n' % (len(self.title_vecs), len(self.title_vecs[0])))
                 for idx, vec in enumerate(self.title_vecs):
@@ -91,12 +97,15 @@ class Title2Rec(AbstractRecommender):
         return self.ft_model.get_numpy_sentence_vector(process_title(playlist['title']).strip())
 
     def recommend(self, playlist, n=500, n_pl=300):
+        if not playlist['title']:
+            return self.fallback.recommend(playlist)
+
         this_vec = self.get_vector_from_title(playlist)
         seeds = list(map(lambda x: str(x), playlist['items']))
 
         # get more popular tracks among the 100 most similar playlists
         most_similar_vec = self.pl_vec.most_similar(positive=[this_vec], topn=n_pl)
-        most_similar_pl = self.playlists[[v[0] for v in most_similar_vec]]
+        most_similar_pl = self.playlists[[int(v[0]) for v in most_similar_vec]]
         predictions_and_seeds = [pl['items'] for pl in most_similar_pl]
         predictions_and_seeds = [item for sublist in predictions_and_seeds for item in sublist]  # flatten
         predictions = [p for p in predictions_and_seeds if p not in seeds]
