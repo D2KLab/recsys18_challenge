@@ -92,6 +92,7 @@ CUDNN = "cudnn"
 BLOCK = "block"
 
 
+
 def do_rank(session, model):
 
     """Ranked from the model"""
@@ -317,10 +318,10 @@ class PTBModel(object):
         if config.rnn_mode == BASIC:
             return tf.contrib.rnn.BasicLSTMCell(
                 config.hidden_size, forget_bias=0.0, state_is_tuple=True,
-                reuse=not is_training)
+                reuse=tf.get_variable_scope().reuse)
         if config.rnn_mode == BLOCK:
             return tf.contrib.rnn.LSTMBlockCell(
-                config.hidden_size, forget_bias=0.0)
+                config.hidden_size, forget_bias=0.0, reuse=not is_training)
         raise ValueError("rnn_mode %s not supported" % config.rnn_mode)
 
     def _build_rnn_graph_lstm(self, inputs, config, is_training):
@@ -503,7 +504,7 @@ class TestConfig(object):
     keep_prob = 1.0
     lr_decay = 0.5
     batch_size = 20
-    rnn_mode = BLOCK
+    rnn_mode = BASIC
 
 
 def run_epoch(session, model, eval_op=None, verbose=False):
@@ -636,9 +637,13 @@ def main(_):
         tf.train.import_meta_graph(metagraph)
         for model in models.values():
             model.import_ops()
+
         sv = tf.train.Supervisor(logdir=FLAGS.save_path)
+        
         config_proto = tf.ConfigProto(allow_soft_placement=soft_placement)
+
         with sv.managed_session(config=config_proto) as session:
+
             for i in range(config.max_max_epoch):
 
                 print(do_rank(session, mtest))
@@ -661,6 +666,7 @@ def main(_):
             if FLAGS.save_path:
                 print("Saving model to %s." % FLAGS.save_path)
                 sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
+                #saver.save(session, FLAGS.save_path)
 
     t_f = time.time()
 
@@ -693,26 +699,46 @@ def test():
     eval_config.batch_size = 1
     eval_config.num_steps = 1
 
+    soft_placement = False
+    if FLAGS.num_gpus > 1:
+        soft_placement = True
+
+    initializer = tf.random_uniform_initializer(-config.init_scale,
+                                                config.init_scale)
+
     with tf.Graph().as_default():
 
-        initializer = tf.random_uniform_initializer(-config.init_scale,
-                                                    config.init_scale)
+        with tf.name_scope("Test"):
+
+            print('model test')
+            test_input = PTBInput(
+                config=eval_config, data=test_data, name="TestInput")
+            with tf.variable_scope("Model", reuse=None, initializer=initializer):
+                mtest = PTBModel(is_training=False, config=eval_config,
+                                 input_=test_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
+                mtest._name = "Test"
+                mtest._initial_state_name = util.with_prefix(mtest._name, "initial")
+                mtest._final_state_name = util.with_prefix(mtest._name, "final")
+
+    with tf.Graph().as_default():
+        
         with tf.Session() as session:
 
-            saver = tf.train.import_meta_graph('models/tensorflow/model.ckpt-1165.meta')
+            saver = tf.train.import_meta_graph('models/tensorflow/model.ckpt-0.meta')
+
+            print('import ops')
+            mtest.import_ops()
+
+            print('restore')
             saver.restore(session, tf.train.latest_checkpoint('models/tensorflow'))
 
-            with tf.name_scope("Test"):
-                print('model test')
-                test_input = PTBInput(
-                    config=eval_config, data=test_data, name="TestInput")
-                with tf.variable_scope("Model", reuse=True, initializer=initializer):
-                    mtest = PTBModel(is_training=False, config=eval_config,
-                                     input_=test_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
+            # adding these 2 lines fixed the hang forever problem
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=session, coord=coord)
 
-                    print(do_rank(session, mtest))
+            print(do_rank(session, mtest))
 
 
 if __name__ == "__main__":
-    tf.app.run()
-    #test()
+    #tf.app.run()
+    test()
