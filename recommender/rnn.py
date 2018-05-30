@@ -747,5 +747,16 @@ def test():
 
 
 if __name__ == "__main__":
-    #tf.app.run()
-    test()
+    
+    import sys
+
+    if sys.argv[1] == "train":
+
+        tf.app.run()
+
+    elif sys.argv[1] == "test":
+
+        test()
+
+    else:
+        raise ValueError("Choose between train and test")
