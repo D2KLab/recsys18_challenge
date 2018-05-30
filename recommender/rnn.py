@@ -64,6 +64,7 @@ from utils.dataset import Dataset
 from gensim.models import Word2Vec
 import time
 
+
 flags = tf.flags
 logging = tf.logging
 
@@ -107,6 +108,10 @@ def do_rank(session, model):
         feed_dict[h] = state[i].h
 
     state, predicts = session.run(fetches, feed_dict)
+
+    pred_array = np.array(predicts)
+
+    print(pred_array.shape)
 
     return predicts
 
@@ -337,6 +342,7 @@ class PTBModel(object):
                     cell, output_keep_prob=config.keep_prob)
             return cell
 
+
         cell = tf.contrib.rnn.MultiRNNCell(
             [make_cell() for _ in range(config.num_layers)], state_is_tuple=True)
 
@@ -345,6 +351,7 @@ class PTBModel(object):
         state = self._initial_state
 
         inputs = tf.unstack(inputs, num=self.num_steps, axis=1)
+
         outputs, state = tf.nn.static_rnn(cell, inputs, initial_state=self._initial_state)
 
         output = tf.reshape(tf.concat(outputs, 1), [-1, config.hidden_size])
@@ -497,7 +504,7 @@ class TestConfig(object):
     learning_rate = 1.0
     max_grad_norm = 1
     num_layers = 1
-    num_steps = 2
+    num_steps = 10
     hidden_size = 3
     max_epoch = 1
     max_max_epoch = 1
@@ -585,13 +592,13 @@ def main(_):
     dataset = Dataset(FLAGS.data_path)
     print('initialized dataset')
 
-    raw_data = reader.read_raw_data(dataset)
-    train_data, valid_data, test_data, voc_size = raw_data
-
     config = get_config()
     eval_config = get_config()
     eval_config.batch_size = 1
     eval_config.num_steps = 1
+
+    raw_data = reader.read_raw_data(config.num_steps, dataset)
+    train_data, valid_data, test_data, voc_size = raw_data
 
     with tf.Graph().as_default():
         initializer = tf.random_uniform_initializer(-config.init_scale,
@@ -616,9 +623,9 @@ def main(_):
         with tf.name_scope("Test"):
             print('model test')
             test_input = PTBInput(
-                config=eval_config, data=test_data, name="TestInput")
+                config=config, data=test_data, name="TestInput")
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
-                mtest = PTBModel(is_training=False, config=eval_config,
+                mtest = PTBModel(is_training=False, config=config,
                                  input_=test_input, vocab_size=voc_size, one_hot=FLAGS.one_hot)
 
         models = {"Train": m, "Valid": mvalid, "Test": mtest}
@@ -691,13 +698,14 @@ def test():
     dataset = Dataset(FLAGS.data_path)
     print('initialized dataset')
 
-    raw_data = reader.read_raw_data(dataset)
-    train_data, valid_data, test_data, voc_size = raw_data
-
     config = get_config()
     eval_config = get_config()
     eval_config.batch_size = 1
     eval_config.num_steps = 1
+
+
+    raw_data = reader.read_raw_data(config.num_steps, dataset)
+    train_data, valid_data, test_data, voc_size = raw_data
 
     soft_placement = False
     if FLAGS.num_gpus > 1:
@@ -726,10 +734,8 @@ def test():
 
             saver = tf.train.import_meta_graph('models/tensorflow/model.ckpt-0.meta')
 
-            print('import ops')
             mtest.import_ops()
 
-            print('restore')
             saver.restore(session, tf.train.latest_checkpoint('models/tensorflow'))
 
             # adding these 2 lines fixed the hang forever problem

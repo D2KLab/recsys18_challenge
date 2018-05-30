@@ -22,22 +22,51 @@ import tensorflow as tf
 import numpy as np
 
 
-def _read_items(filename, dataset, units='items'):
+def _read_items(filename, dataset, num_steps, units='items'):
 
     items = []
 
     for i, playlist in enumerate(dataset.reader('playlists_%s.csv' % filename, 'items_%s.csv' % filename)):
 
-        items.extend(playlist[units])
+        l = len(playlist[units])
 
-        items.append(0)  # index for <eos>
+        if l == 0:
+          continue
+
+        if l == num_steps: 
+
+          items.extend(playlist[units])
+
+        elif l < num_steps:
+
+          num_times = num_steps // l
+
+          remainder = num_steps % l
+
+          for k in range(num_times):
+
+            items.extend(playlist[units])
+
+          items.extend(playlist[units][0:remainder])
+
+        elif l > num_steps:
+
+          num_times = l // num_steps
+
+          remainder = l % num_steps
+
+          items.extend(playlist[units][0:num_times*num_steps])
+
+          items.extend(playlist[units][num_times*num_steps - (num_steps - remainder) : num_times*num_steps])
+
+          items.extend(playlist[units][num_times*num_steps:l])
 
         print('read playlist %s: %d' % (filename, i))
 
     return items
 
 
-def read_raw_data(dataset=None):
+def read_raw_data(num_steps, dataset=None):
 
     """Load MPD dataset from data directory "data_path".
 
@@ -57,17 +86,17 @@ def read_raw_data(dataset=None):
     test_data = {}
 
     print('reading training data')
-    train_data['tracks'] = _read_items("training", dataset, units='items')
-    train_data['albums'] = _read_items("training", dataset, units='albums')
-    train_data['artists'] = _read_items("training", dataset, units='artists')
+    train_data['tracks'] = _read_items("training", dataset, num_steps, units='items')
+    train_data['albums'] = _read_items("training", dataset, num_steps, units='albums')
+    train_data['artists'] = _read_items("training", dataset,num_steps, units='artists')
     print('reading validation data')
-    valid_data['tracks'] = _read_items("validation", dataset, units='items')
-    valid_data['albums'] = _read_items("validation", dataset, units='albums')
-    valid_data['artists'] = _read_items("validation", dataset, units='artists')
+    valid_data['tracks'] = _read_items("validation", dataset,num_steps, units='items')
+    valid_data['albums'] = _read_items("validation", dataset, num_steps, units='albums')
+    valid_data['artists'] = _read_items("validation", dataset, num_steps, units='artists')
     print('reading test data')
-    test_data['tracks'] = _read_items("test", dataset, units='items')
-    test_data['albums'] = _read_items("test", dataset, units='albums')
-    test_data['artists'] = _read_items("test", dataset, units='artists')
+    test_data['tracks'] = _read_items("test", dataset, num_steps, units='items')
+    test_data['albums'] = _read_items("test", dataset, num_steps, units='albums')
+    test_data['artists'] = _read_items("test", dataset, num_steps, units='artists')
 
     vocabulary = len(dataset.tracks_uri2id) + 1
 
@@ -145,8 +174,40 @@ def ptb_producer(raw_data, batch_size, num_steps, name=None):
 
         x_artists.set_shape([batch_size, num_steps])
 
+
         return x_tracks, x_albums, x_artists, y
 
+
+"""
+def length_producer(raw_data, batch_size, N, name=None):
+
+    with tf.name_scope(name, "LengthProducer", [raw_data, batch_size, N]):
+
+        raw_data_lengths = tf.convert_to_tensor(raw_data['lengths'], name="lengths", dtype=tf.int32)
+
+        L = tf.size(raw_data_lengths)
+
+        N = L // batch_size - 1
+
+        #batch_len = data_len // batch_size
+
+        #epoch_size = (data_len // batch_size - 1) // num_steps
+
+        j = tf.train.range_input_producer(N, shuffle=False).dequeue()
+
+        data_lengths = tf.reshape(raw_data_lengths[0: N * batch_size], [batch_size, N])
+
+        print(data_lengths.shape)
+
+        lengths = tf.strided_slice(data_lengths, [0, j * batch_size],
+                             [batch_size, (j + 1) * batch_size])
+
+        print(lengths.shape)
+
+        lengths.set_shape([batch_size])
+
+    return lengths
+"""
 
 """def ptb_iterator(raw_data, batch_size, num_steps):
     
