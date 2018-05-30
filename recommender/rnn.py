@@ -63,7 +63,8 @@ sys.path.append('.')
 from utils.dataset import Dataset
 from gensim.models import Word2Vec
 import time
-
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2"
 
 flags = tf.flags
 logging = tf.logging
@@ -456,14 +457,14 @@ class SmallConfig(object):
     learning_rate = 1.0
     max_grad_norm = 5
     num_layers = 2
-    num_steps = 20
-    hidden_size = 200
+    num_steps = 10
+    hidden_size = 300
     max_epoch = 4
     max_max_epoch = 13
     keep_prob = 1.0
     lr_decay = 0.5
-    batch_size = 20
-    rnn_mode = BLOCK
+    batch_size = 80
+    rnn_mode = BASIC
 
 
 class MediumConfig(object):
@@ -479,7 +480,7 @@ class MediumConfig(object):
     keep_prob = 0.5
     lr_decay = 0.8
     batch_size = 20
-    rnn_mode = BLOCK
+    rnn_mode = BASIC
 
 
 class LargeConfig(object):
