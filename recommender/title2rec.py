@@ -56,12 +56,13 @@ class Title2Rec(AbstractRecommender):
             return w2r.model
 
     def compute_fasttext(self, ft_model_file):
+        ft_model_file = ft_model_file.replace('.bin', '')
         documents = [[process_title(pl['title']).strip() for pl in np.array(self.playlists)[self.clusters == i]]
                      for i in np.arange(self.num_clusters)]
         doc_file = 'models/documents.txt'
         np.savetxt(doc_file, [' '.join(d) for d in documents], fmt='%s')
         model = FastText()
-        model.skipgram(input=doc_file, output=ft_model_file, epoch=100, lr=0.7)
+        model.skipgram(input=doc_file, output=ft_model_file, epoch=100, lr=0.1)
         os.remove(doc_file)
 
         return model
@@ -101,7 +102,7 @@ class Title2Rec(AbstractRecommender):
             return self.fallback.recommend(playlist)
 
         this_vec = self.get_vector_from_title(playlist)
-        seeds = list(map(lambda x: str(x), playlist['items']))
+        seeds = playlist['items']
 
         # get more popular tracks among the 100 most similar playlists
         most_similar_vec = self.pl_vec.most_similar(positive=[this_vec], topn=n_pl)
@@ -109,8 +110,7 @@ class Title2Rec(AbstractRecommender):
         predictions_and_seeds = [pl['items'] for pl in most_similar_pl]
         predictions_and_seeds = [item for sublist in predictions_and_seeds for item in sublist]  # flatten
         predictions = [p for p in predictions_and_seeds if p not in seeds]
-        predictions = sorted(set(predictions), key=predictions.count, reverse=True)[0:n]
-        playlist['items'] = list(map(lambda x: int(x), predictions))
+        playlist['items'] = sorted(set(predictions), key=predictions.count, reverse=True)[0:n]
 
 
 def process_title(word=''):
