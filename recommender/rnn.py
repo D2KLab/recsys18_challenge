@@ -63,8 +63,8 @@ sys.path.append('.')
 from utils.dataset import Dataset
 from gensim.models import Word2Vec
 import time
-import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2"
+#import os
+#os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
 
 flags = tf.flags
 logging = tf.logging
@@ -76,7 +76,7 @@ flags.DEFINE_string("data_path", None,
                     "Where the training/test data is stored.")
 flags.DEFINE_string("save_path", None,
                     "Model output directory.")
-flags.DEFINE_bool("use_fp16", False,
+flags.DEFINE_bool("use_fp16", True,
                   "Train using 16-bit floats instead of 32bit floats")
 flags.DEFINE_integer("num_gpus", 1,
                      "If larger than 1, Grappler AutoParallel optimizer "
@@ -146,7 +146,7 @@ def data_type():
     return tf.float16 if FLAGS.use_fp16 else tf.float32
 
 
-def read_gensim_model(model, name, vocab_size, size, input_data):
+def read_gensim_model(model, name, vocab_size, input_data, size=300):
 
     w2v_track_model = Word2Vec.load(model)
 
@@ -225,17 +225,19 @@ class PTBModel(object):
                 inputs_artists_data = input_.input_data['artists']
 
                 inputs_tracks = read_gensim_model('models/word2rec_dry.w2v', 'embedding_tracks',
-                                                  vocab_size, size, input_tracks_data)
+                                                  vocab_size, input_tracks_data, size=3)
 
                 inputs_albums = read_gensim_model('models/word2rec_dry_albums.w2v', 'embedding_albums',
-                                                  vocab_size, size, input_albums_data)
+                                                  vocab_size, input_albums_data, size=3)
 
                 inputs_artists = read_gensim_model('models/word2rec_dry_artists.w2v', 'embedding_artists',
-                                                   vocab_size, size, inputs_artists_data)
+                                                   vocab_size, inputs_artists_data, size=3)
 
-                inputs = tf.concat([inputs_tracks, inputs_albums, inputs_artists], 2)
+                inputs_ = tf.concat([inputs_tracks, inputs_albums, inputs_artists], 2)
 
-            print(inputs.shape)
+            #print(inputs.shape)
+
+        inputs = tf.layers.dense(inputs_, size)
 
         if is_training and config.keep_prob < 1:
             inputs = tf.nn.dropout(inputs, config.keep_prob)
@@ -251,7 +253,9 @@ class PTBModel(object):
 
         self._sample = tf.multinomial(logits_t, 1)  # this is our sampling operation
 
-        self._logits_t, self._predictions = tf.nn.top_k(logits_t, 500)
+        #self._logits_t, self._predictions = tf.nn.top_k(logits_t, 500)
+
+        self._logits_t = logits_t
 
         # Reshape logits to be a 3-D tensor for sequence loss
         logits = tf.reshape(logits, [self.batch_size, self.num_steps, vocab_size])
@@ -366,7 +370,6 @@ class PTBModel(object):
         """Exports ops to collections."""
         self._name = name
         ops = {util.with_prefix(self._name, "cost"): self._cost,
-               util.with_prefix(self._name, "predictions"): self._predictions,
                util.with_prefix(self._name, "logits_t"): self._logits_t,
                util.with_prefix(self._name, "sample"): self._sample}
         if self._is_training:
@@ -397,7 +400,6 @@ class PTBModel(object):
                     base_variable_scope="Model/RNN")
                 tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, params_saveable)
         self._cost = tf.get_collection_ref(util.with_prefix(self._name, "cost"))[0]
-        self._predictions = tf.get_collection_ref(util.with_prefix(self._name, "predictions"))
         self._logits_t = tf.get_collection_ref(util.with_prefix(self._name, "logits_t"))
         self._sample = tf.get_collection_ref(util.with_prefix(self._name, "sample"))
         num_replicas = FLAGS.num_gpus if self._name == "Train" else 1
@@ -414,9 +416,9 @@ class PTBModel(object):
     def logits_t(self):
         return self._logits_t
 
-    @property
-    def predictions(self):
-        return self._predictions
+    #@property
+    #def predictions(self):
+    #    return self._predictions
 
     @property
     def input(self):
@@ -456,14 +458,14 @@ class SmallConfig(object):
     init_scale = 0.1
     learning_rate = 1.0
     max_grad_norm = 5
-    num_layers = 2
+    num_layers = 1
     num_steps = 10
-    hidden_size = 300
+    hidden_size = 50
     max_epoch = 4
     max_max_epoch = 13
     keep_prob = 1.0
     lr_decay = 0.5
-    batch_size = 80
+    batch_size = 20
     rnn_mode = BASIC
 
 
@@ -654,7 +656,7 @@ def main(_):
 
             for i in range(config.max_max_epoch):
 
-                print(do_rank(session, mtest))
+                #print(do_rank(session, mtest))
 
                 lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
                 m.assign_lr(session, config.learning_rate * lr_decay)
@@ -669,7 +671,7 @@ def main(_):
             test_perplexity = run_epoch(session, mtest)
             print("Test Perplexity: %.3f" % test_perplexity)
 
-            print(do_rank(session, mtest))
+            #print(do_rank(session, mtest))
 
             if FLAGS.save_path:
                 print("Saving model to %s." % FLAGS.save_path)
@@ -743,7 +745,28 @@ def test():
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(sess=session, coord=coord)
 
-            print(do_rank(session, mtest))
+            c = 0
+
+            for step in range(mtest.input.epoch_size):
+
+                state = session.run(mtest.initial_state)
+
+                fetches = [mtest.final_state, mtest.logits_t]
+
+                feed_dict = {}
+                for i, (c, h) in enumerate(mtest.initial_state):
+                    feed_dict[c] = state[i].c
+                    feed_dict[h] = state[i].h
+
+                state, logits_t = session.run(fetches, feed_dict)
+
+                pred_array = np.array(logits_t)
+
+                print(pred_array)
+                print(pred_array.shape)
+                c+= pred_array.shape[1]
+
+            print(c)
 
 
 if __name__ == "__main__":
@@ -752,10 +775,12 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
 
+        print('training the model')
+
         tf.app.run()
 
     elif sys.argv[1] == "test":
-
+        print('testing the model')
         test()
 
     else:
