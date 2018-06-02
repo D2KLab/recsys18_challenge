@@ -28,11 +28,11 @@ def run():
     elif args.recommender == 'random_mp':
         baseline.Random(dataset, dry=args.dry, weighted=True).run(args.output)
     elif args.recommender == 'word2rec_item':
-        baseline.Word2Rec(dataset, dry=args.dry, model_file=args.w2r_model, mode=sentence.Mode.ITEM).run(args.output)
+        baseline.Word2Rec(dataset, dry=args.dry, model_file=args.w2r, mode=sentence.Mode.ITEM).run(args.output)
     elif args.recommender == 'word2rec_album':
-        baseline.Word2Rec(dataset, dry=args.dry, model_file=args.w2r_model, mode=sentence.Mode.ALBUM).run(args.output)
+        baseline.Word2Rec(dataset, dry=args.dry, model_file=args.w2r, mode=sentence.Mode.ALBUM).run(args.output)
     elif args.recommender == 'word2rec_artist':
-        baseline.Word2Rec(dataset, dry=args.dry, model_file=args.w2r_model, mode=sentence.Mode.ARTIST).run(args.output)
+        baseline.Word2Rec(dataset, dry=args.dry, model_file=args.w2r, mode=sentence.Mode.ARTIST).run(args.output)
     elif args.recommender == 'title2rec':
         title2rec.Title2Rec(dataset, dry=args.dry, w2rmodel_file=args.w2r, pl_model_file=args.pl,
                             ft_model_file=args.ft, ft_vec_file=args.ft_vec,

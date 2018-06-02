@@ -87,7 +87,7 @@ class Word2Rec(AbstractRecommender):
         del model
 
     def recommend(self, playlist):
-        seeds = list(map(lambda x: str(x), playlist[self.mode]))
+        seeds = list(map(lambda x: str(x), playlist[self.mode.value]))
 
         if len(seeds) > 0:
             n = 500 - len(seeds)
@@ -95,6 +95,6 @@ class Word2Rec(AbstractRecommender):
             predictions_and_seeds = self.model.most_similar(positive=seeds, topn=n + max_num_seed)
             predictions_and_seeds = [p for (p, s) in predictions_and_seeds]
             predictions = [p for p in predictions_and_seeds if p not in seeds][0:500]
-            playlist[self.mode] = list(map(lambda x: int(x), predictions))
+            playlist[self.mode.value] = list(map(lambda x: int(x), predictions))
         else:
             self.fallback.recommend(playlist)
