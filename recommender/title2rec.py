@@ -18,7 +18,7 @@ def index(l, f):
 
 class Title2Rec(AbstractRecommender):
 
-    def __init__(self, dataset, dry=True, w2rmodel_file=None, pl_model_file=None, ft_model_file=None,
+    def __init__(self, dataset, dry=True, w2r_model_file=None, pl_model_file=None, ft_model_file=None,
                  ft_vec_file=None, cluster_file=None, num_clusters=100, fallback=MostPopular):
         super().__init__(dataset, dry=dry)
         self.playlists = self.dataset.reader(self.train_playlists, self.train_items)
@@ -31,7 +31,7 @@ class Title2Rec(AbstractRecommender):
         else:
             self.num_clusters = num_clusters
 
-            self.w2rmodel = self.get_w2r(dataset, dry, w2rmodel_file)
+            self.w2r_model = self.get_w2r(dataset, dry, w2r_model_file)
             self.pl_embs = self.compute_pl_embs(pl_model_file)
             self.clusters = self.compute_clusters(cluster_file, self.pl_embs, num_clusters)
             self.ft_model = self.compute_fasttext(ft_model_file)
@@ -78,7 +78,7 @@ class Title2Rec(AbstractRecommender):
             return _embs
 
     def get_vector_from_w2r(self, playlist):
-        _item_embs = list(map(lambda track_id: self.w2rmodel[str(track_id)], playlist['items']))
+        _item_embs = list(map(lambda track_id: self.w2r_model[str(track_id)], playlist['items']))
         return np.array(_item_embs).mean(axis=0)
 
     def compute_clusters(self, cluster_file, pl_embs, num_clusters=100):
@@ -186,3 +186,22 @@ def process_title(word=''):
     #     if(len(punctuation)>=1):
     #         print(punctuation)
     return ' '.join(emos + others) + ' ' + word
+
+
+class WordPlusTitle2Rec(AbstractRecommender):
+
+    def __init__(self, dataset, dry=True, w2r_model_file=None, pl_model_file=None, ft_model_file=None,
+                 ft_vec_file=None, cluster_file=None):
+        super().__init__(dataset, dry=dry)
+        self.word2rec = Word2Rec(dataset, dry=dry, model_file=w2r_model_file, mode=sentence.Mode.ITEM)
+        self.title2rec = Title2Rec(dataset, dry=dry, w2r_model_file=w2r_model_file, pl_model_file=pl_model_file,
+                                   ft_model_file=ft_model_file, ft_vec_file=ft_vec_file, cluster_file=cluster_file)
+
+    def recommend(self, playlist):
+        seeds = len(playlist['items'])
+
+        if seeds <= 1:
+            # If we have only the title or just one seed
+            self.title2rec.recommend(playlist)
+        else:
+            self.word2rec.recommend(playlist)

@@ -34,9 +34,13 @@ def run():
     elif args.recommender == 'word2rec_artist':
         baseline.Word2Rec(dataset, dry=args.dry, model_file=args.w2r, mode=sentence.Mode.ARTIST).run(args.output)
     elif args.recommender == 'title2rec':
-        title2rec.Title2Rec(dataset, dry=args.dry, w2rmodel_file=args.w2r, pl_model_file=args.pl,
+        title2rec.Title2Rec(dataset, dry=args.dry, w2r_model_file=args.w2r, pl_model_file=args.pl,
                             ft_model_file=args.ft, ft_vec_file=args.ft_vec,
                             cluster_file=args.cluster).run(args.output)
+    elif args.recommender == 'wordplustitle2rec':
+        title2rec.WordPlusTitle2Rec(dataset, dry=args.dry, w2r_model_file=args.w2r, pl_model_file=args.pl,
+                                    ft_model_file=args.ft, ft_vec_file=args.ft_vec,
+                                    cluster_file=args.cluster).run(args.output)
     else:
         print('Unknown recommender', args.recommender)
 
