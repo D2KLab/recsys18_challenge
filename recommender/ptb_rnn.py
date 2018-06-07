@@ -64,6 +64,8 @@ import numpy as np
 import tensorflow as tf
 import ptb_reader as reader
 
+from recommender.baseline import MostPopular
+
 import sys
 sys.path.append('.')
 from utils.dataset import Dataset
@@ -71,17 +73,16 @@ from utils.dataset import Dataset
 flags = tf.flags
 logging = tf.logging
 
-flags.DEFINE_string(
-    "model", "small",
-    "A type of model. Possible options are: small, medium, large.")
+flags.DEFINE_string("model", "small",
+                    "A type of model. Possible options are: small, medium, large.")
 flags.DEFINE_string("data_path", None,
                     "Where the training/test data is stored.")
 flags.DEFINE_string("save_path", None,
                     "Model output directory.")
 flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
-flags.DEFINE_bool("sample_mode", False,
-                  "Must have trained model ready. Only does sampling")
+flags.DEFINE_string("sample_file", None,
+                    "Must have trained model ready. Only does sampling")
 flags.DEFINE_string("seed_for_sample", "spotify:track:1mea3bSkSGXuIRvnydlB5b",
                     "supply seeding phrase here. it must only contain words from vocabulary")
 
@@ -279,28 +280,54 @@ def do_sample(session, model, data, num_samples):
     state = session.run(model.initial_state)
     fetches = [model.final_state, model.sample]
     sample = None
+
+    # for all the seeds
     for x in data:
         feed_dict = {}
         feed_dict[model.input_data] = [[x]]
+
         for layer_num, (c, h) in enumerate(model.initial_state):
             feed_dict[c] = state[layer_num].c
             feed_dict[h] = state[layer_num].h
 
         state, sample = session.run(fetches, feed_dict)
-    if sample is not None:
-        samples.append(sample[0][0])
-    else:
-        samples.append(0)
+
+        while sample is None or sample[0][0] in data or sample[0][0] == 0:
+            state, sample = session.run(fetches, feed_dict)
+
+    samples.append(sample[0][0])
     k = 1
+
+    # for all the samples
     while k < num_samples:
         feed_dict = {}
         feed_dict[model.input_data] = [[samples[-1]]]
+
         for layer_num, (c, h) in enumerate(model.initial_state):
             feed_dict[c] = state[layer_num].c
             feed_dict[h] = state[layer_num].h
+
         state, sample = session.run(fetches, feed_dict)
+
+        # avoid suggesting <eos>
+        if sample[0][0] == 0:
+            continue
+
+        # avoid suggesting a seed
+        if sample[0][0] in data:
+            continue
+
+        # avoid suggesting duplicated items
+        if sample[0][0] in samples:
+            continue
+
         samples.append(sample[0][0])
         k += 1
+
+    assert 0 not in samples
+    assert len(samples) == num_samples
+    assert len(list(set(samples))) == num_samples
+
     return samples
 
 
@@ -312,14 +339,17 @@ def run_epoch(session, model, data, is_train=False, verbose=False):
     iters = 0
     state = session.run(model.initial_state)
 
-    for step, (x_tracks, x_albums, x_artists, y) in enumerate(reader.ptb_iterator(data, model.batch_size, model.num_steps)):
+    for step, (x_tracks, x_albums, x_artists, y) in enumerate(reader.ptb_iterator(data, model.batch_size,
+                                                                                  model.num_steps)):
         if is_train:
             fetches = [model.cost, model.final_state, model.train_op]
         else:
             fetches = [model.cost, model.final_state]
+
         feed_dict = {}
         feed_dict[model.input_data] = x_tracks  # TODO
         feed_dict[model.targets] = y
+
         for layer_num, (c, h) in enumerate(model.initial_state):
             feed_dict[c] = state[layer_num].c
             feed_dict[h] = state[layer_num].h
@@ -371,11 +401,11 @@ def main(_):
     raw_data = reader.ptb_raw_data(dataset)
     train_data, valid_data, test_data, vocab_size = raw_data
     print('Distinct terms: %d' % vocab_size)
+
     config = get_config()
-    # config.vocab_size = config.vocab_size if config.vocab_size < vocab_size else vocab_size
     config.vocab_size = vocab_size
     eval_config = get_config()
-    # eval_config.vocab_size = eval_config.vocab_size if eval_config.vocab_size < vocab_size else vocab_size
+
     eval_config.vocab_size = vocab_size
     eval_config.batch_size = 1
     eval_config.num_steps = 1
@@ -405,53 +435,59 @@ def main(_):
         sv = tf.train.Supervisor(logdir=FLAGS.save_path, save_model_secs=0, save_summaries_secs=0, saver=saver)
 
         old_valid_perplexity = 10000000000.0
+
         # sessconfig = tf.ConfigProto(allow_soft_placement=True)
         # sessconfig.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+
         with sv.managed_session() as session:
-            if FLAGS.sample_mode:
-                pass
-                # while True:
-                #     inpt = raw_input("Enter your sample prefix: ")
-                #     cnt = int(raw_input("Sample size: "))
-                #     if config.is_char_model:
-                #         seed_for_sample = [c for c in inpt.replace(' ', '_')]
-                #     else:
-                #         seed_for_sample = inpt.split()
-                #     print("Seed: %s" % pretty_print([word_to_id[x] for x in seed_for_sample], config.is_char_model,
-                #                                     id_2_word))
-                #     print("Sample: %s" % pretty_print(
-                #         do_sample(session, mtest, [word_to_id[word] for word in seed_for_sample],
-                #                   cnt), config.is_char_model, id_2_word))
 
-            for i in range(config.max_max_epoch):
+            if FLAGS.sample_file is not None:
 
-                print("Seed: %s" % pretty_print([dataset.tracks_uri2id[x] for x in seed_for_sample],
-                                                dataset.tracks_id2uri))
-                print("Sample: %s" % pretty_print(
-                    do_sample(session, mtest, [dataset.tracks_uri2id[word] for word in seed_for_sample],
-                              max(5 * (len(seed_for_sample) + 1), 10)), dataset.tracks_id2uri))
+                # TODO
+                fallback = MostPopular(dataset, dry=True)
+                writer = dataset.writer(FLAGS.sample_file)
 
-                lr_decay = config.lr_decay ** max(i - config.max_epoch, 0)
-                m.assign_lr(session, config.learning_rate * lr_decay)
-                print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
-                train_perplexity = run_epoch(session, m, train_data, is_train=True, verbose=True)
-                print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
-                valid_perplexity = run_epoch(session, mvalid, valid_data)
-                print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
-                if valid_perplexity < old_valid_perplexity:
-                    old_valid_perplexity = valid_perplexity
-                    sv.saver.save(session, FLAGS.save_path, i)
-                elif valid_perplexity >= 1.3 * old_valid_perplexity:
-                    if len(sv.saver.last_checkpoints) > 0:
-                        sv.saver.restore(session, sv.saver.last_checkpoints[-1])
-                    break
-                else:
-                    if len(sv.saver.last_checkpoints) > 0:
-                        sv.saver.restore(session, sv.saver.last_checkpoints[-1])
-                    lr_decay *= 0.5
+                for i, playlist in enumerate(dataset.reader('playlists_test.csv', 'items_test.csv')):
+                    print('sampling playlist', i)
 
-            test_perplexity = run_epoch(session, mtest, test_data)
-            print("Test Perplexity: %.3f" % test_perplexity)
+                    if len(playlist['items']) == 0:
+                        fallback.recommend(playlist)
+                    else:
+                        playlist['items'] = do_sample(session, mtest, playlist['items'], 500)
+
+                    writer.write(playlist)
+
+            else:
+
+                for i in range(config.max_max_epoch):
+
+                    print("Seed: %s" % pretty_print([dataset.tracks_uri2id[x] for x in seed_for_sample],
+                                                    dataset.tracks_id2uri))
+                    print("Sample: %s" % pretty_print(
+                        do_sample(session, mtest, [dataset.tracks_uri2id[word] for word in seed_for_sample],
+                                  max(5 * (len(seed_for_sample) + 1), 10)), dataset.tracks_id2uri))
+
+                    lr_decay = config.lr_decay ** max(i - config.max_epoch, 0)
+                    m.assign_lr(session, config.learning_rate * lr_decay)
+                    print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
+                    train_perplexity = run_epoch(session, m, train_data, is_train=True, verbose=True)
+                    print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
+                    valid_perplexity = run_epoch(session, mvalid, valid_data)
+                    print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
+                    if valid_perplexity < old_valid_perplexity:
+                        old_valid_perplexity = valid_perplexity
+                        sv.saver.save(session, FLAGS.save_path, i)
+                    elif valid_perplexity >= 1.3 * old_valid_perplexity:
+                        if len(sv.saver.last_checkpoints) > 0:
+                            sv.saver.restore(session, sv.saver.last_checkpoints[-1])
+                        break
+                    else:
+                        if len(sv.saver.last_checkpoints) > 0:
+                            sv.saver.restore(session, sv.saver.last_checkpoints[-1])
+                        lr_decay *= 0.5
+
+                test_perplexity = run_epoch(session, mtest, test_data)
+                print("Test Perplexity: %.3f" % test_perplexity)
 
 
 if __name__ == "__main__":
