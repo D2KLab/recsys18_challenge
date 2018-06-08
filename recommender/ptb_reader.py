@@ -39,7 +39,6 @@ def ptb_raw_data(dataset):
 
     train_data = {}
     valid_data = {}
-    test_data = {}
 
     print('reading training data')
     train_data['tracks'] = _read_items("training", dataset, units='items')
@@ -49,19 +48,16 @@ def ptb_raw_data(dataset):
     valid_data['tracks'] = _read_items("validation", dataset, units='items')
     valid_data['albums'] = _read_items("validation", dataset, units='albums')
     valid_data['artists'] = _read_items("validation", dataset, units='artists')
-    print('reading test data')
-    test_data['tracks'] = _read_items("test", dataset, units='items')
-    test_data['albums'] = _read_items("test", dataset, units='albums')
-    test_data['artists'] = _read_items("test", dataset, units='artists')
 
     vocabulary = len(dataset.tracks_uri2id) + 1
 
     assert len(train_data['tracks']) == len(train_data['albums']) == len(train_data['artists'])
 
-    return train_data, valid_data, test_data, vocabulary
+    return train_data, valid_data, vocabulary
 
 
 def ptb_iterator(raw_data, batch_size, num_steps):
+    # TODO
 
     raw_data_tracks = np.array(raw_data['tracks'], dtype=np.int32)
     raw_data_albums = np.array(raw_data['albums'], dtype=np.int32)

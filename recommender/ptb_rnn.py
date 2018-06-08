@@ -85,6 +85,8 @@ flags.DEFINE_string("sample_file", None,
                     "Must have trained model ready. Only does sampling")
 flags.DEFINE_string("seed_for_sample", "spotify:track:1mea3bSkSGXuIRvnydlB5b",
                     "supply seeding phrase here. it must only contain words from vocabulary")
+flags.DEFINE_bool("rank", False,
+                  "use do_rank instead of do_sample")
 
 FLAGS = flags.FLAGS
 
@@ -147,6 +149,7 @@ class PTBModel(object):
             "softmax_w", [size, vocab_size], dtype=data_type())
         softmax_b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
         logits = tf.matmul(output, softmax_w) + softmax_b
+        self.logits = logits
         self.sample = tf.multinomial(logits, 1)
         loss = tf.contrib.legacy_seq2seq.sequence_loss_by_example(
             [logits],
@@ -274,12 +277,12 @@ class TestConfig(object):
     batch_size = 20
 
 
-def do_sample(session, model, data, num_samples):
+def do_rank(session, model, data, num_samples):
     """Sampled from the model"""
     samples = []
     state = session.run(model.initial_state)
-    fetches = [model.final_state, model.sample]
-    sample = None
+    fetches = [model.final_state, model.logits]
+    logits = None
 
     # for all the seeds
     for x in data:
@@ -290,10 +293,45 @@ def do_sample(session, model, data, num_samples):
             feed_dict[c] = state[layer_num].c
             feed_dict[h] = state[layer_num].h
 
+        state, logits = session.run(fetches, feed_dict)
+
+    sorted_items = np.argsort(logits[0])[::-1]
+    i = 0
+
+    while len(samples) < num_samples:
+        item = sorted_items[i]
+        if item not in data and item != 0:
+            samples.append(item)
+        i += 1
+
+    assert 0 not in samples
+    assert len(samples) == num_samples
+    assert len(list(set(samples))) == num_samples
+
+    return samples
+
+
+def do_sample(session, model, data, num_samples):
+    """Sampled from the model"""
+    samples = []
+    state = session.run(model.initial_state)
+    fetches = [model.final_state, model.sample]
+    sample = None
+
+    # for all the seeds
+    for i, x in enumerate(data):
+        feed_dict = {}
+        feed_dict[model.input_data] = [[x]]
+
+        for layer_num, (c, h) in enumerate(model.initial_state):
+            feed_dict[c] = state[layer_num].c
+            feed_dict[h] = state[layer_num].h
+
         state, sample = session.run(fetches, feed_dict)
 
-        while sample is None or sample[0][0] in data or sample[0][0] == 0:
-            state, sample = session.run(fetches, feed_dict)
+        if i == len(data) - 1:
+            while sample is None or sample[0][0] in data or sample[0][0] == 0:
+                state, sample = session.run(fetches, feed_dict)
 
     samples.append(sample[0][0])
     k = 1
@@ -399,7 +437,7 @@ def main(_):
 
     dataset = Dataset(FLAGS.data_path)
     raw_data = reader.ptb_raw_data(dataset)
-    train_data, valid_data, test_data, vocab_size = raw_data
+    train_data, valid_data, vocab_size = raw_data
     print('Distinct terms: %d' % vocab_size)
 
     config = get_config()
@@ -453,7 +491,10 @@ def main(_):
                     if len(playlist['items']) == 0:
                         fallback.recommend(playlist)
                     else:
-                        playlist['items'] = do_sample(session, mtest, playlist['items'], 500)
+                        if FLAGS.rank:
+                            playlist['items'] = do_rank(session, mtest, playlist['items'], 500)
+                        else:
+                            playlist['items'] = do_sample(session, mtest, playlist['items'], 500)
 
                     writer.write(playlist)
 
@@ -486,8 +527,8 @@ def main(_):
                             sv.saver.restore(session, sv.saver.last_checkpoints[-1])
                         lr_decay *= 0.5
 
-                test_perplexity = run_epoch(session, mtest, test_data)
-                print("Test Perplexity: %.3f" % test_perplexity)
+                # test_perplexity = run_epoch(session, mtest, test_data)
+                # print("Test Perplexity: %.3f" % test_perplexity)
 
 
 if __name__ == "__main__":
