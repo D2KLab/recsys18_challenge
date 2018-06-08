@@ -49,11 +49,9 @@ def ptb_raw_data(dataset):
     valid_data['albums'] = _read_items("validation", dataset, units='albums')
     valid_data['artists'] = _read_items("validation", dataset, units='artists')
 
-    vocabulary = len(dataset.tracks_uri2id) + 1
-
     assert len(train_data['tracks']) == len(train_data['albums']) == len(train_data['artists'])
 
-    return train_data, valid_data, vocabulary
+    return train_data, valid_data
 
 
 def ptb_iterator(raw_data, batch_size, num_steps):

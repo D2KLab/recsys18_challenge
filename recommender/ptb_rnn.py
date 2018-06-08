@@ -436,9 +436,9 @@ def main(_):
         raise ValueError("Must set --data_path to PTB data directory")
 
     dataset = Dataset(FLAGS.data_path)
-    raw_data = reader.ptb_raw_data(dataset)
-    train_data, valid_data, vocab_size = raw_data
-    print('Distinct terms: %d' % vocab_size)
+
+    # the number of tracks plus <eos>
+    vocab_size = len(dataset.tracks_uri2id) + 1
 
     config = get_config()
     config.vocab_size = vocab_size
@@ -481,7 +481,7 @@ def main(_):
 
             if FLAGS.sample_file is not None:
 
-                # TODO
+                # TODO should be title2rec
                 fallback = MostPopular(dataset, dry=True)
                 writer = dataset.writer(FLAGS.sample_file)
 
@@ -499,6 +499,9 @@ def main(_):
                     writer.write(playlist)
 
             else:
+
+                train_data, valid_data = reader.ptb_raw_data(dataset)
+                print('Distinct terms: %d' % vocab_size)
 
                 for i in range(config.max_max_epoch):
 
