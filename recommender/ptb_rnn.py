@@ -64,6 +64,8 @@ import numpy as np
 import tensorflow as tf
 import ptb_reader as reader
 
+from os import path
+from gensim.models import Word2Vec
 from recommender.baseline import MostPopular
 
 import sys
@@ -87,6 +89,8 @@ flags.DEFINE_string("seed_for_sample", "spotify:track:1mea3bSkSGXuIRvnydlB5b",
                     "supply seeding phrase here. it must only contain words from vocabulary")
 flags.DEFINE_bool("rank", False,
                   "use do_rank instead of do_sample")
+flags.DEFINE_string("embs", None,
+                    "the path with the embeddings")
 
 FLAGS = flags.FLAGS
 
@@ -95,10 +99,35 @@ def data_type():
     return tf.float16 if FLAGS.use_fp16 else tf.float32
 
 
+def embeddings(vocab_size, size, dataset):
+    if FLAGS.embs is None:
+        return tf.get_variable("embedding", [vocab_size, size], dtype=data_type())
+    else:
+        w2v_tracks = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry.w2v'))
+        w2v_albums = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry_albums.w2v'))
+        w2v_artists = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry_artists.w2v'))
+
+        embs = np.zeros((vocab_size, 300), dtype=np.float32)
+
+        for i in range(1, vocab_size):
+            album_id = dataset.tracks_id2album[i]
+            artist_id = dataset.tracks_id2artist[i]
+            embs[i] = np.concatenate((w2v_tracks.wv[str(i)],
+                                      w2v_albums.wv[str(album_id)],
+                                      w2v_artists.wv[str(artist_id)]))
+
+        embs_initializer = tf.constant_initializer(embs)
+
+        return tf.get_variable(name="embedding",
+                               shape=(vocab_size, 300),
+                               initializer=embs_initializer,
+                               trainable=False, dtype=data_type())
+
+
 class PTBModel(object):
     """The PTB model."""
 
-    def __init__(self, is_training, config):
+    def __init__(self, is_training, config, dataset):
 
         self.batch_size = batch_size = config.batch_size
         self.num_steps = num_steps = config.num_steps
@@ -120,8 +149,7 @@ class PTBModel(object):
         self._initial_state = cell.zero_state(batch_size, data_type())
 
         with tf.device("/cpu:0"):
-            embedding = tf.get_variable(
-                "embedding", [vocab_size, size], dtype=data_type())
+            embedding = embeddings(vocab_size, size, dataset)
             inputs = tf.nn.embedding_lookup(embedding, self._input_data)
 
         if is_training and config.keep_prob < 1:
@@ -371,21 +399,20 @@ def do_sample(session, model, data, num_samples):
 
 def run_epoch(session, model, data, is_train=False, verbose=False):
     """Runs the model on the given data."""
-    epoch_size = ((len(data['tracks']) // model.batch_size) - 1) // model.num_steps
+    epoch_size = ((len(data) // model.batch_size) - 1) // model.num_steps
     start_time = time.time()
     costs = 0.0
     iters = 0
     state = session.run(model.initial_state)
 
-    for step, (x_tracks, x_albums, x_artists, y) in enumerate(reader.ptb_iterator(data, model.batch_size,
-                                                                                  model.num_steps)):
+    for step, (x, y) in enumerate(reader.ptb_iterator(data, model.batch_size, model.num_steps)):
         if is_train:
             fetches = [model.cost, model.final_state, model.train_op]
         else:
             fetches = [model.cost, model.final_state]
 
         feed_dict = {}
-        feed_dict[model.input_data] = x_tracks  # TODO
+        feed_dict[model.input_data] = x
         feed_dict[model.targets] = y
 
         for layer_num, (c, h) in enumerate(model.initial_state):
@@ -456,18 +483,18 @@ def main(_):
         with tf.name_scope("Train"):
 
             with tf.variable_scope("Model", reuse=None, initializer=initializer):
-                m = PTBModel(is_training=True, config=config)
+                m = PTBModel(is_training=True, config=config, dataset=dataset)
                 tf.summary.scalar("Training Loss", m.cost)
                 tf.summary.scalar("Learning Rate", m.lr)
 
         with tf.name_scope("Valid"):
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
-                mvalid = PTBModel(is_training=False, config=config)
+                mvalid = PTBModel(is_training=False, config=config, dataset=dataset)
                 tf.summary.scalar("Validation Loss", mvalid.cost)
 
         with tf.name_scope("Test"):
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
-                mtest = PTBModel(is_training=False, config=eval_config)
+                mtest = PTBModel(is_training=False, config=eval_config, dataset=dataset)
 
         saver = tf.train.Saver(name='saver', write_version=tf.train.SaverDef.V2)
         sv = tf.train.Supervisor(logdir=FLAGS.save_path, save_model_secs=0, save_summaries_secs=0, saver=saver)
