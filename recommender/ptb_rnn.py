@@ -66,10 +66,10 @@ import ptb_reader as reader
 
 from os import path
 from gensim.models import Word2Vec
-from recommender.baseline import MostPopular
 
 import sys
 sys.path.append('.')
+from recommender.baseline import MostPopular
 from utils.dataset import Dataset
 
 flags = tf.flags
