@@ -512,7 +512,7 @@ def main(_):
                 fallback = MostPopular(dataset, dry=True)
                 writer = dataset.writer(FLAGS.sample_file)
 
-                for i, playlist in enumerate(dataset.reader('playlists_test.csv', 'items_test.csv')):
+                for i, playlist in enumerate(dataset.reader('playlists_test.csv', 'items_test_x.csv')):
                     print('sampling playlist', i)
 
                     if len(playlist['items']) == 0:
