@@ -99,35 +99,27 @@ def data_type():
     return tf.float16 if FLAGS.use_fp16 else tf.float32
 
 
-def embeddings(vocab_size, size, dataset):
-    if FLAGS.embs is None:
-        return tf.get_variable("embedding", [vocab_size, size], dtype=data_type())
-    else:
-        w2v_tracks = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry.w2v'))
-        w2v_albums = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry_albums.w2v'))
-        w2v_artists = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry_artists.w2v'))
+def embeddings(vocab_size, dataset):
+    w2v_tracks = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry.w2v'))
+    w2v_albums = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry_albums.w2v'))
+    w2v_artists = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry_artists.w2v'))
 
-        embs = np.zeros((vocab_size, 300), dtype=np.float32)
+    embs = np.zeros((vocab_size, 300), dtype=np.float32)
 
-        for i in range(1, vocab_size):
-            album_id = dataset.tracks_id2album[i]
-            artist_id = dataset.tracks_id2artist[i]
-            embs[i] = np.concatenate((w2v_tracks.wv[str(i)],
-                                      w2v_albums.wv[str(album_id)],
-                                      w2v_artists.wv[str(artist_id)]))
+    for i in range(1, vocab_size):
+        album_id = dataset.tracks_id2album[i]
+        artist_id = dataset.tracks_id2artist[i]
+        embs[i] = np.concatenate((w2v_tracks.wv[str(i)],
+                                  w2v_albums.wv[str(album_id)],
+                                  w2v_artists.wv[str(artist_id)]))
 
-        embs_initializer = tf.constant_initializer(embs)
-
-        return tf.get_variable(name="embedding",
-                               shape=(vocab_size, 300),
-                               initializer=embs_initializer,
-                               trainable=False, dtype=data_type())
+    return embs
 
 
 class PTBModel(object):
     """The PTB model."""
 
-    def __init__(self, is_training, config, dataset):
+    def __init__(self, is_training, config):
 
         self.batch_size = batch_size = config.batch_size
         self.num_steps = num_steps = config.num_steps
@@ -149,8 +141,11 @@ class PTBModel(object):
         self._initial_state = cell.zero_state(batch_size, data_type())
 
         with tf.device("/cpu:0"):
-            embedding = embeddings(vocab_size, size, dataset)
-            inputs = tf.nn.embedding_lookup(embedding, self._input_data)
+            if FLAGS.embs is None:
+                self.embedding = tf.get_variable("embedding", [vocab_size, size], dtype=data_type())
+            else:
+                self.embedding = tf.get_variable("embedding", [vocab_size, 300], dtype=data_type(), trainable=False)
+            inputs = tf.nn.embedding_lookup(self.embedding, self._input_data)
 
         if is_training and config.keep_prob < 1:
             inputs = tf.nn.dropout(inputs, config.keep_prob)
@@ -168,7 +163,8 @@ class PTBModel(object):
         state = self._initial_state
         with tf.variable_scope("RNN"):
             for time_step in range(num_steps):
-                if time_step > 0: tf.get_variable_scope().reuse_variables()
+                if time_step > 0:
+                    tf.get_variable_scope().reuse_variables()
                 (cell_output, state) = cell(inputs[:, time_step, :], state)
                 outputs.append(cell_output)
 
@@ -211,6 +207,9 @@ class PTBModel(object):
 
     def assign_lr(self, session, lr_value):
         session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
+
+    def assign_embedding(self, session, embedding_value):
+        session.run(self.embedding.initializer, feed_dict={self.embedding.initial_value: embedding_value})
 
     @property
     def input_data(self):
@@ -483,18 +482,18 @@ def main(_):
         with tf.name_scope("Train"):
 
             with tf.variable_scope("Model", reuse=None, initializer=initializer):
-                m = PTBModel(is_training=True, config=config, dataset=dataset)
+                m = PTBModel(is_training=True, config=config)
                 tf.summary.scalar("Training Loss", m.cost)
                 tf.summary.scalar("Learning Rate", m.lr)
 
         with tf.name_scope("Valid"):
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
-                mvalid = PTBModel(is_training=False, config=config, dataset=dataset)
+                mvalid = PTBModel(is_training=False, config=config)
                 tf.summary.scalar("Validation Loss", mvalid.cost)
 
         with tf.name_scope("Test"):
             with tf.variable_scope("Model", reuse=True, initializer=initializer):
-                mtest = PTBModel(is_training=False, config=eval_config, dataset=dataset)
+                mtest = PTBModel(is_training=False, config=eval_config)
 
         saver = tf.train.Saver(name='saver', write_version=tf.train.SaverDef.V2)
         sv = tf.train.Supervisor(logdir=FLAGS.save_path, save_model_secs=0, save_summaries_secs=0, saver=saver)
@@ -505,6 +504,12 @@ def main(_):
         # sessconfig.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
 
         with sv.managed_session() as session:
+
+            if FLAGS.embs is not None:
+                embedding = embeddings(vocab_size, dataset)
+                m.assign_embedding(session, embedding)
+                mvalid.assign_embedding(session, embedding)
+                mtest.assign_embedding(session, embedding)
 
             if FLAGS.sample_file is not None:
 
