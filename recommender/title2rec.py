@@ -8,8 +8,8 @@ from gensim.models import Word2Vec, KeyedVectors
 from sklearn.cluster import KMeans
 
 from utils import sentence
-from ._recommender import AbstractRecommender
-from .baseline import Word2Rec, MostPopular
+from _recommender import AbstractRecommender
+from baseline import Word2Rec, MostPopular
 
 
 def index(l, f):
@@ -18,9 +18,14 @@ def index(l, f):
 
 class Title2Rec(AbstractRecommender):
 
-    def __init__(self, dataset, dry=True, w2r_model_file=None, pl_model_file=None, ft_model_file=None,
-                 ft_vec_file=None, cluster_file=None, num_clusters=100, fallback=MostPopular):
+    def __init__(self, dataset=False, dry=True, w2r_model_file=None, pl_model_file=None, ft_model_file=None,
+                 ft_vec_file=None, cluster_file=None, num_clusters=100, fallback=MostPopular, rnn=False):
         super().__init__(dataset, dry=dry)
+
+        if rnn:
+            self.init_light(ft_model_file)
+            return
+
         self.playlists = self.dataset.reader(self.train_playlists, self.train_items)
         self.playlists = np.array(list(filter(lambda p: p['title'] and len(p['items']) > 0, self.playlists)))
 
@@ -37,13 +42,16 @@ class Title2Rec(AbstractRecommender):
             self.ft_model = self.compute_fasttext(ft_model_file)
 
         if not os.path.isfile(ft_vec_file):
-            self.title_vecs = [self.get_vector_from_title(pl) for pl in self.playlists]
+            self.title_vecs = [self.get_title_vector_from_playlist(pl) for pl in self.playlists]
             with open(ft_vec_file, 'w') as file_handler:
                 file_handler.write('%d %d\n' % (len(self.title_vecs), len(self.title_vecs[0])))
                 for idx, vec in enumerate(self.title_vecs):
                     file_handler.write('%d %s\n' % (idx, ' '.join(vec.astype(np.str))))
 
         self.pl_vec = KeyedVectors.load_word2vec_format(ft_vec_file, binary=False)
+
+    def init_light(self, ft_model_file):
+        self.ft_model = FastText(ft_model_file)
 
     def get_w2r(self, dataset, dry, model_file):
         if os.path.isfile(model_file):
@@ -94,14 +102,17 @@ class Title2Rec(AbstractRecommender):
             np.savetxt(cluster_file, clusters, fmt="%u")
             return clusters
 
-    def get_vector_from_title(self, playlist):
-        return self.ft_model.get_numpy_sentence_vector(process_title(playlist['title']).strip())
+    def get_vector_from_title(self, title):
+        return self.ft_model.get_numpy_sentence_vector(process_title(title).strip())
+
+    def get_title_vector_from_playlist(self, playlist):
+        return self.get_vector_from_title(playlist['title'])
 
     def recommend(self, playlist, n=500, n_pl=300):
         if not playlist['title']:
             return self.fallback.recommend(playlist)
 
-        this_vec = self.get_vector_from_title(playlist)
+        this_vec = self.get_title_vector_from_playlist(playlist)
         seeds = playlist['items']
 
         # get more popular tracks among the 100 most similar playlists
