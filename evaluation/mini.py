@@ -84,6 +84,9 @@ output_items_writer = csv.writer(output_items_file)
 while counter < validation_size:
     candidate_pid = candidate_pid_list.pop(0)
 
+    if len(items[candidate_pid]) < 10:
+        continue
+
     for item in items[candidate_pid]:
         if item[2] not in tracks_ids:
             break
@@ -111,6 +114,9 @@ output_items_y_writer = csv.writer(output_items_y_file)
 
 while counter < validation_size:
     candidate_pid = candidate_pid_list.pop(0)
+
+    if len(items[candidate_pid]) < 10:
+        continue
 
     for item in items[candidate_pid]:
         if item[2] not in tracks_ids:
