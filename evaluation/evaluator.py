@@ -146,50 +146,36 @@ for row in items_test_y_reader:
     else:
         items_y[pid] = [row[2]]
 
-# Precision per track
-precision_tracks = np.full(len(playlists_pid), 0.0)
+# R-Precision
+precision = np.full(len(playlists_pid), 0.0)
 
 for i, pid in enumerate(playlists_pid):
     try:
         g_tracks = items_y[pid]
+        g_artists = track2artist(items_y[pid])
     except KeyError:
         continue
     g_tracks_size = len(g_tracks)
     r_tracks = submission[pid][:g_tracks_size]
+    m_artists = []
 
     for track_uri in r_tracks:
         if track_uri in g_tracks:
-            precision_tracks[i] += 1
+            precision[i] += 1
+        else:
+            artist_uri = tracks[track_uri]
+            if artist_uri in g_artists and artist_uri not in m_artists:
+                precision[i] += 0.25
+                m_artists.append(artist_uri)
 
-    precision_tracks[i] /= g_tracks_size
+    precision[i] /= g_tracks_size
 
-print('Precision per track', precision_tracks.mean())
+print('R-Precision:', precision.mean())
 if args.verbose is True:
-    print_evaluation(precision_tracks)
+    print_evaluation(precision)
 
-# Precision per artist
-precision_artists = np.full(len(playlists_pid), 0.0)
-
-for i, pid in enumerate(playlists_pid):
-    try:
-        g_artists = track2artist(items_y[pid])
-    except KeyError:
-        continue
-    g_artists_size = len(g_artists)
-    r_artists = track2artist(submission[pid][:g_artists_size])
-
-    for artist_uri in r_artists:
-        if artist_uri in g_artists:
-            precision_artists[i] += 1
-
-    precision_artists[i] /= g_artists_size
-
-print('Precision per artist', precision_artists.mean())
-if args.verbose is True:
-    print_evaluation(precision_artists)
-
-# NDCG per track
-ndcg_tracks = np.full(len(playlists_pid), 0.0)
+# NDCG
+ndcg = np.full(len(playlists_pid), 0.0)
 
 for i, pid in enumerate(playlists_pid):
     try:
@@ -202,9 +188,9 @@ for i, pid in enumerate(playlists_pid):
     for index, track_uri in enumerate(r_tracks):
         if track_uri in g_tracks:
             if index != 0:
-                ndcg_tracks[i] += 1 / math.log2(index + 1)
+                ndcg[i] += 1 / math.log2(index + 1)
             else:
-                ndcg_tracks[i] += 1
+                ndcg[i] += 1
 
     # IDCG
     idcg = 1.0
@@ -215,47 +201,14 @@ for i, pid in enumerate(playlists_pid):
             index += 1
 
     # NDCG
-    ndcg_tracks[i] /= idcg
+    ndcg[i] /= idcg
 
-print('NDCG per track', ndcg_tracks.mean())
+print('NDCG:', ndcg.mean())
 if args.verbose is True:
-    print_evaluation(ndcg_tracks)
+    print_evaluation(ndcg)
 
-# NDCG per artist
-ndcg_artists = np.full(len(playlists_pid), 0.0)
-
-for i, pid in enumerate(playlists_pid):
-    try:
-        g_artists = track2artist(items_y[pid])
-    except KeyError:
-        continue
-    r_artists = track2artist(submission[pid])
-
-    # DCG
-    for index, artist_uri in enumerate(r_artists):
-        if artist_uri in g_artists:
-            if index != 0:
-                ndcg_artists[i] += 1 / math.log2(index + 1)
-            else:
-                ndcg_artists[i] += 1
-
-    # IDCG
-    idcg = 1.0
-    for artist_uri in r_artists:
-        index = 2
-        if artist_uri in g_artists:
-            idcg += 1 / math.log2(index)
-            index += 1
-
-    # NDCG
-    ndcg_artists[i] /= idcg
-
-print('NDCG per artist', ndcg_artists.mean())
-if args.verbose is True:
-    print_evaluation(ndcg_artists)
-
-# Clicks per track
-clicks_tracks = np.full(len(playlists_pid), 51)
+# Clicks
+clicks = np.full(len(playlists_pid), 51)
 
 for i, pid in enumerate(playlists_pid):
     try:
@@ -266,28 +219,9 @@ for i, pid in enumerate(playlists_pid):
 
     for index, track_uri in enumerate(r_tracks):
         if track_uri in g_tracks:
-            clicks_tracks[i] = math.floor(index / 10)
+            clicks[i] = math.floor(index / 10)
             break
 
-print('Clicks per track', clicks_tracks.mean())
+print('Clicks:', clicks.mean())
 if args.verbose is True:
-    print_evaluation(clicks_tracks)
-
-# Clicks per artist
-clicks_artists = np.full(len(playlists_pid), 51)
-
-for i, pid in enumerate(playlists_pid):
-    try:
-        g_artists = track2artist(items_y[pid])
-    except KeyError:
-        continue
-    r_artists = track2artist(submission[pid])
-
-    for index, artist_uri in enumerate(r_artists):
-        if artist_uri in g_artists:
-            clicks_artists[i] = math.floor(index / 10)
-            break
-
-print('Clicks per artist', clicks_artists.mean())
-if args.verbose is True:
-    print_evaluation(clicks_artists)
+    print_evaluation(clicks)
