@@ -1,6 +1,8 @@
 import os
 import re
 from pyfasttext import FastText
+from nltk.corpus import stopwords
+import nltk
 
 import emot
 import numpy as np
@@ -21,6 +23,7 @@ class Title2Rec(AbstractRecommender):
     def __init__(self, dataset, dry=True, w2r_model_file=None, pl_model_file=None, ft_model_file=None,
                  ft_vec_file=None, cluster_file=None, num_clusters=100, fallback=MostPopular):
         super().__init__(dataset, dry=dry)
+        print('Import playlists')
         self.playlists = self.dataset.reader(self.train_playlists, self.train_items)
         self.playlists = np.array(list(filter(lambda p: p['title'] and len(p['items']) > 0, self.playlists)))
 
@@ -29,12 +32,17 @@ class Title2Rec(AbstractRecommender):
         if os.path.isfile(ft_model_file):
             self.ft_model = FastText(ft_model_file)
         else:
+            print('***Full init started***')
             self.num_clusters = num_clusters
-
+            print('- Import w2r models')
             self.w2r_model = self.get_w2r(dataset, dry, w2r_model_file)
+            print('- Compute playlists embeddings')
             self.pl_embs = self.compute_pl_embs(pl_model_file)
+            print('- Cluster the playlist')
             self.clusters = self.compute_clusters(cluster_file, self.pl_embs, num_clusters)
+            print('- Fast_text on the clusters')
             self.ft_model = self.compute_fasttext(ft_model_file)
+            print('***Full init end***')
 
         if not os.path.isfile(ft_vec_file):
             self.title_vecs = [self.get_vector_from_title(pl) for pl in self.playlists]
@@ -44,6 +52,8 @@ class Title2Rec(AbstractRecommender):
                     file_handler.write('%d %s\n' % (idx, ' '.join(vec.astype(np.str))))
 
         self.pl_vec = KeyedVectors.load_word2vec_format(ft_vec_file, binary=False)
+
+        # nltk.download('stopwords')
 
     def get_w2r(self, dataset, dry, model_file):
         if os.path.isfile(model_file):
@@ -57,13 +67,17 @@ class Title2Rec(AbstractRecommender):
 
     def compute_fasttext(self, ft_model_file):
         ft_model_file = ft_model_file.replace('.bin', '')
-        documents = [[process_title(pl['title']).strip() for pl in np.array(self.playlists)[self.clusters == i]]
-                     for i in np.arange(self.num_clusters)]
+
+        documents = []
+        for i in np.arange(self.num_clusters):
+            involved_pl = np.array(self.playlists)[self.clusters == i]
+            documents.append(process_title(pl['title']).strip() for pl in involved_pl)
+
         doc_file = 'models/documents.txt'
         np.savetxt(doc_file, [' '.join(d) for d in documents], fmt='%s')
         model = FastText()
         model.skipgram(input=doc_file, output=ft_model_file, epoch=100, lr=0.1)
-        os.remove(doc_file)
+        # os.remove(doc_file)
 
         return model
 
@@ -107,14 +121,32 @@ class Title2Rec(AbstractRecommender):
         # get more popular tracks among the 100 most similar playlists
         most_similar_vec = self.pl_vec.most_similar(positive=[this_vec], topn=n_pl)
         most_similar_pl = self.playlists[[int(v[0]) for v in most_similar_vec]]
+        weights = [v[1] for v in most_similar_vec]
+
         predictions_and_seeds = [pl['items'] for pl in most_similar_pl]
-        predictions_and_seeds = [item for sublist in predictions_and_seeds for item in sublist]  # flatten
-        predictions = [p for p in predictions_and_seeds if p not in seeds]
-        playlist['items'] = sorted(set(predictions), key=predictions.count, reverse=True)[0:n]
+        # predictions_and_seeds = [item for sublist in predictions_and_seeds for item in sublist]  # flatten
+        playlist['items'] = count_and_weights(predictions_and_seeds, seeds, weights)[0:n]
+
+
+def count_and_weights(list_of_listes, seeds, weights):
+    _set = [item for sublist in list_of_listes for item in sublist]  # flatten
+    _set = set([p for p in _set if p not in seeds])
+
+    votes = {}
+    for item in _set:
+        votes[item] = 0
+        for p, pl in enumerate(list_of_listes):
+            w = weights[p]
+            # w = 1
+            if item in pl:
+                votes[item] += 1 * w
+
+    return sorted(_set, key=lambda x: votes[x], reverse=True)
 
 
 def process_title(word=''):
     # punctuation_regex = r"[()]?[.,!?;~:]+"
+
     specials = [r':-?[\)\(]+']
 
     word = word.lower()
@@ -169,7 +201,7 @@ def process_title(word=''):
     #     punctuation = re.findall(punctuation_regex, word)
     #     for p in punctuation:
     #         word = word.replace(p, ' ')
-
+    #
     #     # parentesis
     #     word = re.sub(r'[\(\)]', '', word)
 
@@ -183,8 +215,15 @@ def process_title(word=''):
     # hashtag
     word = re.sub(r'^#', '', word)
 
-    #     if(len(punctuation)>=1):
-    #         print(punctuation)
+    # #remove stopwords
+    # stop_words = stopwords.words('english')
+    # ' '.join([w for w in word.split(' ') if w not in stop_words])
+
+    # remove spaces
+    # word_no_spaces = word.replace(' ', '')
+
+    # if(len(punctuation)>=1):
+    #       print(punctuation)
     return ' '.join(emos + others) + ' ' + word
 
 
