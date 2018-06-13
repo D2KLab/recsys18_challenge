@@ -150,7 +150,10 @@ for row in items_test_y_reader:
 precision_tracks = np.full(len(playlists_pid), 0.0)
 
 for i, pid in enumerate(playlists_pid):
-    g_tracks = items_y[pid]
+    try:
+        g_tracks = items_y[pid]
+    except KeyError:
+        continue
     g_tracks_size = len(g_tracks)
     r_tracks = submission[pid][:g_tracks_size]
 
@@ -168,7 +171,10 @@ if args.verbose is True:
 precision_artists = np.full(len(playlists_pid), 0.0)
 
 for i, pid in enumerate(playlists_pid):
-    g_artists = track2artist(items_y[pid])
+    try:
+        g_artists = track2artist(items_y[pid])
+    except KeyError:
+        continue
     g_artists_size = len(g_artists)
     r_artists = track2artist(submission[pid][:g_artists_size])
 
@@ -186,7 +192,10 @@ if args.verbose is True:
 ndcg_tracks = np.full(len(playlists_pid), 0.0)
 
 for i, pid in enumerate(playlists_pid):
-    g_tracks = items_y[pid]
+    try:
+        g_tracks = items_y[pid]
+    except KeyError:
+        continue
     r_tracks = submission[pid]
 
     # DCG
@@ -216,7 +225,10 @@ if args.verbose is True:
 ndcg_artists = np.full(len(playlists_pid), 0.0)
 
 for i, pid in enumerate(playlists_pid):
-    g_artists = track2artist(items_y[pid])
+    try:
+        g_artists = track2artist(items_y[pid])
+    except KeyError:
+        continue
     r_artists = track2artist(submission[pid])
 
     # DCG
@@ -246,7 +258,10 @@ if args.verbose is True:
 clicks_tracks = np.full(len(playlists_pid), 51)
 
 for i, pid in enumerate(playlists_pid):
-    g_tracks = items_y[pid]
+    try:
+        g_tracks = items_y[pid]
+    except KeyError:
+        continue
     r_tracks = submission[pid]
 
     for index, track_uri in enumerate(r_tracks):
@@ -262,7 +277,10 @@ if args.verbose is True:
 clicks_artists = np.full(len(playlists_pid), 51)
 
 for i, pid in enumerate(playlists_pid):
-    g_artists = track2artist(items_y[pid])
+    try:
+        g_artists = track2artist(items_y[pid])
+    except KeyError:
+        continue
     r_artists = track2artist(submission[pid])
 
     for index, artist_uri in enumerate(r_artists):
