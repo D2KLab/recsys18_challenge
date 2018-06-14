@@ -8,8 +8,8 @@ from gensim.models import Word2Vec, KeyedVectors
 from sklearn.cluster import KMeans
 
 from utils import sentence
-from _recommender import AbstractRecommender
-from baseline import Word2Rec, MostPopular
+from ._recommender import AbstractRecommender
+from .baseline import Word2Rec, MostPopular
 
 
 def index(l, f):
