@@ -423,7 +423,7 @@ def do_sample(session, model, playlist, num_samples):
 
 def run_epoch(session, model, data, is_train=False, verbose=False):
     """Runs the model on the given data."""
-    epoch_size = ((len(data) // model.batch_size) - 1) // model.num_steps
+    epoch_size = ((len(data[0]) // model.batch_size) - 1) // model.num_steps
     start_time = time.time()
     costs = 0.0
     iters = 0
