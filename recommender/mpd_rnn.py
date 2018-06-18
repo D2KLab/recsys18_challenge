@@ -84,20 +84,22 @@ flags.DEFINE_string("data_path", None,
                     "Where the training/test data is stored.")
 flags.DEFINE_string("save_path", None,
                     "Model output directory.")
+flags.DEFINE_string("restore_path", None,
+                    "Model to restore.")
 flags.DEFINE_bool("use_fp16", False,
-                  "Train using 16-bit floats instead of 32bit floats")
+                  "Train using 16-bit floats instead of 32bit floats.")
 flags.DEFINE_bool("is_dry", True,
-                  "Specify if this is a dry or an official run")
+                  "Specify if this is a dry or an official run.")
 flags.DEFINE_string("sample_file", None,
-                    "Must have trained model ready")
+                    "Must have trained model ready.")
 flags.DEFINE_string("strategy", "summed_rank",
-                    "The strategy for creating the output file")
+                    "The strategy for creating the output file.")
 flags.DEFINE_integer("memory", 100,
-                     "The memory for the summed_rank")
+                     "The memory for the summed_rank.")
 flags.DEFINE_string("embs", "models/embs/1M",
-                    "The directory with the tracks embeddings")
+                    "The directory with the tracks embeddings.")
 flags.DEFINE_string("title_embs", None,
-                    "The file with the titles embeddings")
+                    "The file with the titles embeddings.")
 
 FLAGS = flags.FLAGS
 
@@ -465,7 +467,7 @@ def do_sample(session, model, playlist, num_samples):
     playlist['items'] = samples
 
 
-def run_epoch(session, model, data, is_train=False, verbose=False):
+def run_epoch(session, model, data, is_train=False, verbose=False, sv=None, epoch=None):
     """Runs the model on the given data."""
     epoch_size = ((len(data[0]) // model.batch_size) - 1) // model.num_steps
     start_time = time.time()
@@ -495,6 +497,17 @@ def run_epoch(session, model, data, is_train=False, verbose=False):
 
         costs += cost
         iters += model.num_steps
+        
+        if epoch is not None:
+            epoch_s = str(epoch)
+            progress = str(step * 100 // epoch_size)
+            iteration_s = epoch_s + progress
+            iteration = int(iteration_s)
+
+            # print(epoch_s, progress, iteration_s, iteration)
+
+            if sv and (step == epoch_size // 2):
+                sv.saver.save(session, FLAGS.save_path, iteration)
 
         if verbose and step % (epoch_size // 10) == 10:
             print("%.3f perplexity: %.3f speed: %.0f wps" %
@@ -572,6 +585,8 @@ def main(_):
         # sessconfig.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
 
         with sv.managed_session() as session:
+            if FLAGS.restore_path is not None:
+                saver.restore(session, tf.train.latest_checkpoint(FLAGS.restore_path))
 
             if FLAGS.embs is not None:
                 items_embeddings = get_items_embeddings(vocab_size, dataset)
@@ -623,13 +638,13 @@ def main(_):
                     lr_decay = config.lr_decay ** max(i - config.max_epoch, 0)
                     m.assign_lr(session, config.learning_rate * lr_decay)
                     print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
-                    train_perplexity = run_epoch(session, m, train_data, is_train=True, verbose=True)
+                    train_perplexity = run_epoch(session, m, train_data, is_train=True, verbose=True, sv=sv, epoch=i)
                     print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
                     valid_perplexity = run_epoch(session, mvalid, valid_data)
                     print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
                     if valid_perplexity < old_valid_perplexity:
                         old_valid_perplexity = valid_perplexity
-                        sv.saver.save(session, FLAGS.save_path, i)
+                        sv.saver.save(session, FLAGS.save_path, (i + 1) * 100)
                     elif valid_perplexity >= 1.3 * old_valid_perplexity:
                         if len(sv.saver.last_checkpoints) > 0:
                             sv.saver.restore(session, sv.saver.last_checkpoints[-1])
