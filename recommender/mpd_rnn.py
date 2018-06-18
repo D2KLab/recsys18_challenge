@@ -72,7 +72,7 @@ import mpd_reader as reader
 from os import path
 from gensim.models import Word2Vec
 
-from recommender.baseline import MostPopular
+from recommender.title2rec import Title2Rec
 from utils.dataset import Dataset
 
 flags = tf.flags
@@ -86,14 +86,18 @@ flags.DEFINE_string("save_path", None,
                     "Model output directory.")
 flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
+flags.DEFINE_bool("is_dry", True,
+                  "Specify if this is a dry or an official run")
 flags.DEFINE_string("sample_file", None,
-                    "Must have trained model ready. Only does sampling")
-flags.DEFINE_bool("rank", False,
-                  "use do_rank instead of do_sample")
-flags.DEFINE_string("embs", None,
-                    "the path with the embeddings")
+                    "Must have trained model ready")
+flags.DEFINE_string("strategy", "summed_rank",
+                    "The strategy for creating the output file")
+flags.DEFINE_integer("memory", 100,
+                     "The memory for the summed_rank")
+flags.DEFINE_string("embs", "models/embs/1M",
+                    "The directory with the tracks embeddings")
 flags.DEFINE_string("title_embs", None,
-                    "the file with the titles embeddings")
+                    "The file with the titles embeddings")
 
 FLAGS = flags.FLAGS
 
@@ -146,15 +150,15 @@ class PTBModel(object):
 
         with tf.device("/cpu:0"):
             if FLAGS.embs is None:
-                self.embeddings = tf.get_variable("embeddings", [vocab_size, size], dtype=data_type())
+                self.embeddings = tf.get_variable("embedding", [vocab_size, size], dtype=data_type())
                 inputs = tf.nn.embedding_lookup(self.embeddings, self._input_items)
             else:
-                self.items_embeddings = tf.get_variable("items_embeddings", [vocab_size, 300],
+                self.items_embeddings = tf.get_variable("embedding", [vocab_size, 300],
                                                         dtype=data_type(), trainable=False)
                 if FLAGS.title_embs is None:
                     inputs = tf.nn.embedding_lookup(self.items_embeddings, self._input_items)
                 else:
-                    self.playlists_embeddings = tf.get_variable("playlists_embeddings", [1049362, 100],
+                    self.playlists_embeddings = tf.get_variable("playlist_embedding", [1049362, 100],
                                                                 dtype=data_type(), trainable=False)
                     items_inputs = tf.nn.embedding_lookup(self.items_embeddings, self._input_items)
                     playlists_inputs = tf.nn.embedding_lookup(self.playlists_embeddings, self._input_playlists)
@@ -360,6 +364,46 @@ def do_rank(session, model, playlist, num_samples):
     playlist['items'] = samples
 
 
+def do_summed_rank(session, model, playlist, num_samples, memory=100):
+
+    samples = []
+    state = session.run(model.initial_state)
+    fetches = [model.final_state, model.logits]
+    sum_logits = None
+
+    # for all the seeds
+    for i, x in enumerate(playlist['items']):
+        feed_dict = {}
+        feed_dict[model.input_items] = [[x]]
+
+        for layer_num, (c, h) in enumerate(model.initial_state):
+            feed_dict[c] = state[layer_num].c
+            feed_dict[h] = state[layer_num].h
+
+        state, logits = session.run(fetches, feed_dict)
+
+        if sum_logits is None:
+            sum_logits = np.zeros(len(logits[0]))
+
+        if len(playlist['items']) - i <= memory:
+            sum_logits += logits[0]
+
+    sorted_items = np.argsort(sum_logits)[::-1]
+    i = 0
+
+    while len(samples) < num_samples:
+        item = sorted_items[i]
+        if item not in playlist['items'] and item != 0:
+            samples.append(item)
+        i += 1
+
+    assert 0 not in samples
+    assert len(samples) == num_samples
+    assert len(list(set(samples))) == num_samples
+
+    playlist['items'] = samples
+
+
 def do_sample(session, model, playlist, num_samples):
 
     pid = int(playlist['pid']) + 1
@@ -543,20 +587,29 @@ def main(_):
 
             if FLAGS.sample_file is not None:
 
-                # TODO should be title2rec
-                fallback = MostPopular(dataset, dry=True)
+                fallback = Title2Rec(dataset, dry=FLAGS.is_dry, ft_model_file='models/fast_text/ft.bin',
+                                     ft_vec_file='models/fast_text/ft_vec.bin')
                 writer = dataset.writer(FLAGS.sample_file)
 
-                for i, playlist in enumerate(dataset.reader('playlists_test.csv', 'items_test_x.csv')):
+                if FLAGS.is_dry:
+                    dataset_reader = dataset.reader('playlists_test.csv', 'items_test_x.csv')
+                else:
+                    dataset_reader = dataset.reader('playlists_challenge.csv', 'items_challenge.csv')
+
+                for i, playlist in enumerate(dataset_reader):
                     print('sampling playlist', i)
 
                     if len(playlist['items']) == 0:
                         fallback.recommend(playlist)
                     else:
-                        if FLAGS.rank:
+                        if FLAGS.strategy == "rank":
                             do_rank(session, mtest, playlist, 500)
-                        else:
+                        elif FLAGS.strategy == "summed_rank":
+                            do_summed_rank(session, mtest, playlist, 500, memory=FLAGS.memory)
+                        elif FLAGS.strategy == "sample":
                             do_sample(session, mtest, playlist, 500)
+                        else:
+                            raise RuntimeError("Unknown strategy " + FLAGS.strategy)
 
                     writer.write(playlist)
 
