@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 
 from utils.dataset import Dataset
 from recommender import baseline
@@ -41,6 +42,16 @@ def run():
         title2rec.WordPlusTitle2Rec(dataset, dry=args.dry, w2r_model_file=args.w2r, pl_model_file=args.pl,
                                     ft_model_file=args.ft, ft_vec_file=args.ft_vec,
                                     cluster_file=args.cluster).run(args.output)
+    elif args.recommender == 'title2rec_embs':
+        t2r = title2rec.Title2Rec(rnn=True, ft_model_file=args.ft)
+        embeddings = np.zeros((1049362, 100), dtype=np.float32)
+        for playlist in dataset.reader('playlists.csv', 'items.csv'):
+            pid = int(playlist['pid']) + 1
+            embeddings[pid] = t2r.get_title_vector_from_playlist(playlist)
+        for playlist in dataset.reader('playlists_challenge.csv', 'items_challenge.csv'):
+            pid = int(playlist['pid']) + 1
+            embeddings[pid] = t2r.get_title_vector_from_playlist(playlist)
+        np.save(args.output, embeddings)
     else:
         print('Unknown recommender', args.recommender)
 
