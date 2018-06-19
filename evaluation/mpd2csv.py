@@ -14,9 +14,11 @@ args = parser.parse_args()
 items_file = open(path.join(args.out_path, 'items.csv'), 'w', newline='', encoding='utf8')
 playlists_file = open(path.join(args.out_path, 'playlists.csv'), 'w', newline='', encoding='utf8')
 tracks_file = open(path.join(args.out_path, 'tracks.csv'), 'w', newline='', encoding='utf8')
+playlists_descr_file = open(path.join(args.out_path, 'playlists_descr.csv'), 'w', newline='', encoding='utf8')
 
 items_writer = csv.writer(items_file)
 playlists_writer = csv.writer(playlists_file)
+playlists_descr_writer = csv.writer(playlists_descr_file)
 tracks_writer = csv.writer(tracks_file)
 
 tracks = set()
@@ -32,6 +34,9 @@ for mpd_slice in listdir(args.mpd_path):
                                        playlist['num_artists'], playlist['num_albums'],
                                        playlist['num_followers'], playlist['num_edits'],
                                        playlist['modified_at'], playlist['duration_ms']])
+
+            if 'description' in playlist:
+                playlists_writer.writerow([playlist['pid'], playlist['description']])
 
             for track in playlist['tracks']:
                 items_writer.writerow([playlist['pid'], track['pos'], track['track_uri']])

@@ -1,15 +1,17 @@
 import os
 import re
-from pyfasttext import FastText
-
+import csv
+import html
 import emot
 import numpy as np
+from pyfasttext import FastText
 from gensim.models import Word2Vec, KeyedVectors
 from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from utils import sentence
-from _recommender import AbstractRecommender
-from baseline import Word2Rec, MostPopular
+from ._recommender import AbstractRecommender
+from .baseline import Word2Rec, MostPopular
 
 
 def index(l, f):
@@ -21,12 +23,12 @@ class Title2Rec(AbstractRecommender):
     def __init__(self, dataset=False, dry=True, w2r_model_file=None, pl_model_file=None, ft_model_file=None,
                  ft_vec_file=None, cluster_file=None, num_clusters=100, fallback=MostPopular, rnn=False):
         super().__init__(dataset, dry=dry)
-        print('Import playlists')
 
         if rnn:
             self.init_light(ft_model_file)
             return
 
+        print('Import playlists')
         self.playlists = self.dataset.reader(self.train_playlists, self.train_items)
         self.playlists = np.array(list(filter(lambda p: p['title'] and len(p['items']) > 0, self.playlists)))
 
@@ -73,11 +75,18 @@ class Title2Rec(AbstractRecommender):
 
     def compute_fasttext(self, ft_model_file):
         ft_model_file = ft_model_file.replace('.bin', '')
+        descr_keywords = self.compute_tfidf_descr()
 
         documents = []
         for i in np.arange(self.num_clusters):
             involved_pl = np.array(self.playlists)[self.clusters == i]
-            documents.append(process_title(pl['title']).strip() for pl in involved_pl)
+            # take only collaboratives
+            involved_pl = list(filter(lambda pl: pl['collaborative'], involved_pl))
+
+            titles = [process_title(pl['title']).strip() for pl in involved_pl]
+            descr = [' '.join(descr_keywords[pl['pid']]) if pl['pid'] in descr_keywords else ''
+                     for pl in involved_pl]
+            documents.append(titles + descr)
 
         doc_file = 'models/documents.txt'
         np.savetxt(doc_file, [' '.join(d) for d in documents], fmt='%s')
@@ -86,6 +95,28 @@ class Title2Rec(AbstractRecommender):
         os.remove(doc_file)
 
         return model
+
+    def compute_tfidf_descr(self):
+        description = dict()
+
+        with open('data/playlists_descr.csv', 'r', newline='') as descr_file:
+            description_reader = csv.reader(descr_file)
+            for d in description_reader:
+                text = d[1]
+                if "soundiiz" not in text:
+                    description[d[0]] = text
+
+        tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 1), min_df=0, stop_words='english')
+        corpus = [process_description(v) for k, v in description.items()]
+
+        tfidf_matrix = tf.fit_transform(corpus)
+        feature_names = tf.get_feature_names()
+
+        dense = tfidf_matrix.todense()
+        keywords = dict()
+        for i, k in enumerate(list(description.keys())):
+            keywords[k] = get_descr_keywords(i, 3, dense, feature_names)
+        return keywords
 
     def compute_pl_embs(self, pl_model_file):
         if os.path.isfile(pl_model_file):
@@ -131,6 +162,10 @@ class Title2Rec(AbstractRecommender):
         most_similar_vec = self.pl_vec.most_similar(positive=[this_vec], topn=n_pl)
         most_similar_pl = self.playlists[[int(v[0]) for v in most_similar_vec]]
         weights = [v[1] for v in most_similar_vec]
+        # prioritize collaborative playlists
+        # weights = np.multiply(weights, [1.3 if pl['collaborative'] else 1.0 for pl in most_similar_pl])
+        # prioritize edited playlists
+        # weights = np.multiply(weights, [0.9 + pl['num_edits'] / 10 for pl in most_similar_pl])
 
         predictions_and_seeds = [pl['items'] for pl in most_similar_pl]
         playlist['items'] = count_and_weights(predictions_and_seeds, seeds, weights)[0:n]
@@ -150,6 +185,26 @@ def count_and_weights(list_of_listes, seeds, weights):
                 votes[item] += 1 * w
 
     return sorted(_set, key=lambda x: votes[x], reverse=True)
+
+
+def clean_html(raw_html):
+    cleanr = re.compile('<.*?>')
+    cleantext = re.sub(cleanr, '', raw_html)
+    return cleantext
+
+
+def process_description(text):
+    # unescape html
+    text = clean_html(html.unescape(text))
+    # remove uris
+    text = re.sub(r'https?:\/\/.*', ' ', text, flags=re.MULTILINE)
+    # remove numbers (apart from years after 1900)
+    text = re.sub(r'\d(st|nd|th|ish)', ' ', text, flags=re.MULTILINE)
+    text = re.sub(r'(\d+\/)+(\d{4})', r"\2", text)
+    rgx = r'(^|[^a-zA-Z0-9\'])(\d{1,3}|\d{5,})([^a-zA-Z0-9\']|$)'
+    text = re.sub(rgx, ' ', text, flags=re.MULTILINE)
+    text = re.sub(rgx, ' ', text, flags=re.MULTILINE)
+    return text.lower().strip()
 
 
 def process_title(word=''):
@@ -227,11 +282,17 @@ def process_title(word=''):
     # ' '.join([w for w in word.split(' ') if w not in stop_words])
 
     # remove spaces
-    # word_no_spaces = word.replace(' ', '')
+    word_no_spaces = word.replace(' ', '')
 
     # if(len(punctuation)>=1):
     #       print(punctuation)
-    return ' '.join(emos + others) + ' ' + word
+    return ' '.join(emos + others) + ' ' + word + ' ' + word_no_spaces
+
+
+def get_descr_keywords(pl, n, dense, feature_names):
+    phrase = dense[pl].tolist()[0]
+    phrase_scores = [pair for pair in zip(range(0, len(phrase)), phrase) if pair[1] > 0]
+    return [feature_names[ft] for ft, score in sorted(phrase_scores, key=lambda t: t[1] * -1)[:n]]
 
 
 class WordPlusTitle2Rec(AbstractRecommender):
