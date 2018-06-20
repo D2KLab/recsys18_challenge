@@ -64,6 +64,7 @@ sys.path.append('.')
 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
 
 import numpy as np
 import tensorflow as tf
@@ -412,6 +413,20 @@ class LargeConfig(object):
     lr_decay = 1 / 1.15
     batch_size = 20
 
+class OptimalConfig(object):
+    max_epoch = 2
+    max_max_epoch = 2
+    init_scale = 0.1
+    max_grad_norm = 5
+    keep_prob = 1.0
+    batch_size = 40
+    lr_decay = 0.5
+    num_layers = 1
+
+    optimizer = 'AdamOptimizer'
+    learning_rate = 1.0
+    num_steps = 20
+    hidden_size = 100
 
 class TestConfig(object):
     """Tiny config, for testing."""
@@ -625,7 +640,6 @@ def pretty_print(items, id2word):
             continue
     return ' '.join(uris)
 
-
 def get_config():
     if FLAGS.model == "small":
         return SmallConfig()
@@ -635,6 +649,8 @@ def get_config():
         return LargeConfig()
     elif FLAGS.model == "test":
         return TestConfig()
+    elif FLAGS.model == "optimal":
+        return OptimalConfig()
     else:
         raise ValueError("Invalid model: %s", FLAGS.model)
 
