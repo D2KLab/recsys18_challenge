@@ -106,39 +106,41 @@ flags.DEFINE_string("lyrics", None,
 FLAGS = flags.FLAGS
 
 
-def lyrics_emb(lyrics, data, track_id):
+def lyrics_emb(lyrics, data_index, track_id):
 
-    if not np.any(data['spotify_track_uri'] == track_id):
+    try:
 
-        return np.zeros(lyrics_emb_len(lyrics)-300)
-
-    else:
+        feature_vector = data_index.loc[track_id]['feature_vector']
 
         if lyrics == "style":
 
-            lyrics_vec_1 = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][0:12]
+            lyrics_vec_1 = feature_vector[0:12]
 
-            lyrics_vec_2 = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][-1:]
+            lyrics_vec_2 = feature_vector[-1:]
 
             lyrics_vec = np.concatenate([lyrics_vec_1, lyrics_vec_2])
 
         elif lyrics == "emotion":
 
-            lyrics_vec = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][12:18]
+            lyrics_vec = feature_vector[12:18]
 
         elif lyrics == "grammatical":
 
-            lyrics_vec = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][18:40]
+            lyrics_vec = feature_vector[18:40]
 
         elif lyrics == "fuzzy":
 
-            lyrics_vec = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][12:40]
+            lyrics_vec = feature_vector[12:40]
 
         else:
 
-            lyrics_vec = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0]
+            lyrics_vec = feature_vector
 
-        return lyrics_vec
+    except KeyError:
+
+        lyrics_vec = np.zeros(lyrics_emb_len(lyrics)-300)
+
+    return lyrics_vec
 
 
 def lyrics_emb_len(lyrics):
@@ -169,6 +171,7 @@ def lyrics_emb_len(lyrics):
 
     return emb_len
 
+
 def data_type():
     return tf.float16 if FLAGS.use_fp16 else tf.float32
 
@@ -186,13 +189,15 @@ def get_items_embeddings(vocab_size, dataset, lyrics):
 
         embeddings = np.zeros((vocab_size, emb_len), dtype=np.float32)
 
+        data_index = data.set_index(['spotify_track_uri'])
+
         for i in range(1, vocab_size):
             album_id = dataset.tracks_id2album[i]
             artist_id = dataset.tracks_id2artist[i]
             track_id = dataset.tracks_id2uri[i]
             id_lyrics = track_id.replace("spotify:track:", "")
 
-            lyrics_vec = lyrics_emb(lyrics, data, id_lyrics)
+            lyrics_vec = lyrics_emb(lyrics, data_index, id_lyrics)
 
             embeddings[i] = np.concatenate((w2v_tracks.wv[str(i)],
                                            w2v_albums.wv[str(album_id)],
@@ -683,10 +688,14 @@ def main(_):
                 saver.restore(session, tf.train.latest_checkpoint(FLAGS.restore_path))
 
             if FLAGS.embs is not None:
+                t = time.time()
                 items_embeddings = get_items_embeddings(vocab_size, dataset, FLAGS.lyrics)
                 m.assign_items_embeddings(session, items_embeddings)
                 mvalid.assign_items_embeddings(session, items_embeddings)
                 mtest.assign_items_embeddings(session, items_embeddings)
+                t2 = time.time()
+                print('time for reading embeddings')
+                print(t2-t)
 
                 if FLAGS.title_embs is not None:
                     playlists_embeddings = np.load(FLAGS.title_embs)
