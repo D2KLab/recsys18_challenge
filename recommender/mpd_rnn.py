@@ -417,8 +417,8 @@ class LargeConfig(object):
 
 
 class OptimalConfig(object):
-    max_epoch = 2
-    max_max_epoch = 2
+    max_epoch = 20
+    max_max_epoch = 20
     init_scale = 0.1
     max_grad_norm = 5
     keep_prob = 1.0
@@ -427,8 +427,8 @@ class OptimalConfig(object):
     num_layers = 1
     optimizer = 'AdamOptimizer'
     learning_rate = 1.0
-    num_steps = 20
-    hidden_size = 100
+    num_steps = 10
+    hidden_size = 50
 
 
 class TestConfig(object):
