@@ -68,6 +68,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import numpy as np
 import tensorflow as tf
 import mpd_reader as reader
+import pandas as pd
 
 from os import path
 from gensim.models import Word2Vec
@@ -100,27 +101,114 @@ flags.DEFINE_string("embs", "models/embs/1M",
                     "The directory with the tracks embeddings.")
 flags.DEFINE_string("title_embs", None,
                     "The file with the titles embeddings.")
-
+flags.DEFINE_string("lyrics", None,
+                    "The lyrics features pickle file")
 FLAGS = flags.FLAGS
 
+
+def lyrics_emb(lyrics, data, track_id):
+
+    if not np.any(data['spotify_track_uri'] == track_id):
+
+        return np.zeros(lyrics_emb_len(lyrics)-300)
+
+    else:
+
+        if lyrics == "style":
+
+            lyrics_vec_1 = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][0:12]
+
+            lyrics_vec_2 = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][-1:]
+
+            lyrics_vec = np.concatenate([lyrics_vec_1, lyrics_vec_2])
+
+        elif lyrics == "emotion":
+
+            lyrics_vec = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][12:18]
+
+        elif lyrics == "grammatical":
+
+            lyrics_vec = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][18:40]
+
+        elif lyrics == "fuzzy":
+
+            lyrics_vec = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0][12:40]
+
+        else:
+
+            lyrics_vec = data[data['spotify_track_uri'] == track_id]['feature_vector'].values[0]
+
+        return lyrics_vec
+
+
+def lyrics_emb_len(lyrics):
+
+    if lyrics == "style":
+
+        emb_len = 313
+
+    elif lyrics == "emotion":
+
+        emb_len = 306
+
+    elif lyrics == "grammatical":
+
+        emb_len = 322
+
+    elif lyrics == "fuzzy":
+
+        emb_len = 327
+
+    elif lyrics == "all":
+
+        emb_len = 341
+
+    else:
+
+        raise ValueError("lyrics must be either style, emotion, grammatical, fuzzy or all")
+
+    return emb_len
 
 def data_type():
     return tf.float16 if FLAGS.use_fp16 else tf.float32
 
 
-def get_items_embeddings(vocab_size, dataset):
+def get_items_embeddings(vocab_size, dataset, lyrics):
     w2v_tracks = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry.w2v'))
     w2v_albums = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry_albums.w2v'))
     w2v_artists = Word2Vec.load(path.join(FLAGS.embs, 'word2rec_dry_artists.w2v'))
 
-    embeddings = np.zeros((vocab_size, 300), dtype=np.float32)
+    if lyrics:
 
-    for i in range(1, vocab_size):
-        album_id = dataset.tracks_id2album[i]
-        artist_id = dataset.tracks_id2artist[i]
-        embeddings[i] = np.concatenate((w2v_tracks.wv[str(i)],
-                                       w2v_albums.wv[str(album_id)],
-                                       w2v_artists.wv[str(artist_id)]))
+        data = pd.read_pickle('models/lyrics/spotify_uri_features.pickle')
+
+        emb_len = lyrics_emb_len(lyrics)
+
+        embeddings = np.zeros((vocab_size, emb_len), dtype=np.float32)
+
+        for i in range(1, vocab_size):
+            album_id = dataset.tracks_id2album[i]
+            artist_id = dataset.tracks_id2artist[i]
+            track_id = dataset.tracks_id2uri[i]
+            id_lyrics = track_id.replace("spotify:track:", "")
+
+            lyrics_vec = lyrics_emb(lyrics, data, id_lyrics)
+
+            embeddings[i] = np.concatenate((w2v_tracks.wv[str(i)],
+                                           w2v_albums.wv[str(album_id)],
+                                           w2v_artists.wv[str(artist_id)],
+                                            lyrics_vec))
+
+    else:
+
+        embeddings = np.zeros((vocab_size, 300), dtype=np.float32)
+
+        for i in range(1, vocab_size):
+            album_id = dataset.tracks_id2album[i]
+            artist_id = dataset.tracks_id2artist[i]
+            embeddings[i] = np.concatenate((w2v_tracks.wv[str(i)],
+                                           w2v_albums.wv[str(album_id)],
+                                           w2v_artists.wv[str(artist_id)]))
 
     return embeddings
 
@@ -155,7 +243,13 @@ class PTBModel(object):
                 self.embeddings = tf.get_variable("embedding", [vocab_size, size], dtype=data_type())
                 inputs = tf.nn.embedding_lookup(self.embeddings, self._input_items)
             else:
-                self.items_embeddings = tf.get_variable("embedding", [vocab_size, 300],
+
+                if FLAGS.lyrics:
+                    emb_len = lyrics_emb_len(FLAGS.lyrics)
+                    self.items_embeddings = tf.get_variable("embedding", [vocab_size, emb_len],
+                                                        dtype=data_type(), trainable=False)
+                else:
+                    self.items_embeddings = tf.get_variable("embedding", [vocab_size, 300],
                                                         dtype=data_type(), trainable=False)
                 if FLAGS.title_embs is None:
                     inputs = tf.nn.embedding_lookup(self.items_embeddings, self._input_items)
@@ -589,7 +683,7 @@ def main(_):
                 saver.restore(session, tf.train.latest_checkpoint(FLAGS.restore_path))
 
             if FLAGS.embs is not None:
-                items_embeddings = get_items_embeddings(vocab_size, dataset)
+                items_embeddings = get_items_embeddings(vocab_size, dataset, FLAGS.lyrics)
                 m.assign_items_embeddings(session, items_embeddings)
                 mvalid.assign_items_embeddings(session, items_embeddings)
                 mtest.assign_items_embeddings(session, items_embeddings)
