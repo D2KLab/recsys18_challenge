@@ -64,7 +64,7 @@ sys.path.append('.')
 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 import numpy as np
 import tensorflow as tf
@@ -104,6 +104,7 @@ flags.DEFINE_string("title_embs", None,
                     "The file with the titles embeddings.")
 flags.DEFINE_string("lyrics", None,
                     "The lyrics features pickle file")
+
 FLAGS = flags.FLAGS
 
 
@@ -253,10 +254,11 @@ class PTBModel(object):
                 if FLAGS.lyrics:
                     emb_len = lyrics_emb_len(FLAGS.lyrics)
                     self.items_embeddings = tf.get_variable("embedding", [vocab_size, emb_len],
-                                                        dtype=data_type(), trainable=False)
+                                                            dtype=data_type(), trainable=False)
                 else:
                     self.items_embeddings = tf.get_variable("embedding", [vocab_size, 300],
-                                                        dtype=data_type(), trainable=False)
+                                                            dtype=data_type(), trainable=False)
+
                 if FLAGS.title_embs is None:
                     inputs = tf.nn.embedding_lookup(self.items_embeddings, self._input_items)
                 else:
@@ -413,6 +415,7 @@ class LargeConfig(object):
     lr_decay = 1 / 1.15
     batch_size = 20
 
+
 class OptimalConfig(object):
     max_epoch = 2
     max_max_epoch = 2
@@ -422,11 +425,11 @@ class OptimalConfig(object):
     batch_size = 40
     lr_decay = 0.5
     num_layers = 1
-
     optimizer = 'AdamOptimizer'
     learning_rate = 1.0
     num_steps = 20
     hidden_size = 100
+
 
 class TestConfig(object):
     """Tiny config, for testing."""
@@ -482,15 +485,17 @@ def do_rank(session, model, playlist, num_samples):
 
 def do_summed_rank(session, model, playlist, num_samples, memory=100):
 
-    samples = []
+    pid = int(playlist['pid']) + 1
     state = session.run(model.initial_state)
     fetches = [model.final_state, model.logits]
     sum_logits = None
+    samples = []
 
     # for all the seeds
     for i, x in enumerate(playlist['items']):
         feed_dict = {}
         feed_dict[model.input_items] = [[x]]
+        feed_dict[model.input_playlists] = [[pid]]
 
         for layer_num, (c, h) in enumerate(model.initial_state):
             feed_dict[c] = state[layer_num].c
@@ -704,14 +709,10 @@ def main(_):
                 saver.restore(session, tf.train.latest_checkpoint(FLAGS.restore_path))
 
             if FLAGS.embs is not None:
-                t = time.time()
                 items_embeddings = get_items_embeddings(vocab_size, dataset, FLAGS.lyrics)
                 m.assign_items_embeddings(session, items_embeddings)
                 mvalid.assign_items_embeddings(session, items_embeddings)
                 mtest.assign_items_embeddings(session, items_embeddings)
-                t2 = time.time()
-                print('time for reading embeddings')
-                print(t2-t)
 
                 if FLAGS.title_embs is not None:
                     playlists_embeddings = np.load(FLAGS.title_embs)
