@@ -159,7 +159,7 @@ def lyrics_emb_len(lyrics):
 
     elif lyrics == "fuzzy":
 
-        emb_len = 327
+        emb_len = 328
 
     elif lyrics == "all":
 
