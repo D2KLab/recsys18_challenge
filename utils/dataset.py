@@ -77,7 +77,8 @@ class Dataset:
                                         'title': playlists[item[0]][1],
                                         'items': [track_id],
                                         'artists': [artist_id],
-                                        'albums': [album_id]}
+                                        'albums': [album_id],
+                                        'pos': [int(item[1])]}
                     continue
 
                 if current_playlist['pid'] == item[0]:
@@ -87,6 +88,7 @@ class Dataset:
                     current_playlist['items'].append(track_id)
                     current_playlist['artists'].append(artist_id)
                     current_playlist['albums'].append(album_id)
+                    current_playlist['pos'].append(int(item[1]))
                 else:
                     previous_playlist = current_playlist
                     track_id = self.tracks_uri2id[item[2]]
@@ -96,7 +98,8 @@ class Dataset:
                                         'title': playlists[item[0]][1],
                                         'items': [track_id],
                                         'artists': [artist_id],
-                                        'albums': [album_id]}
+                                        'albums': [album_id],
+                                        'pos': [int(item[1])]}
                     yield previous_playlist
 
             # Only the last time
@@ -108,7 +111,8 @@ class Dataset:
                                     'title': playlists[playlist_id][1],
                                     'items': [],
                                     'artists': [],
-                                    'albums': []}
+                                    'albums': [],
+                                    'pos': []}
                 yield current_playlist
 
     def writer(self, submission_path, main=True):
