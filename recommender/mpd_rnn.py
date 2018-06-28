@@ -96,8 +96,8 @@ flags.DEFINE_string("sample_file", None,
                     "Must have trained model ready.")
 flags.DEFINE_string("strategy", "summed_rank",
                     "The strategy for creating the output file.")
-flags.DEFINE_integer("memory", 100,
-                     "The memory for the summed_rank.")
+flags.DEFINE_string("smooth", None,
+                    "The smooth for the summed_rank.")
 flags.DEFINE_string("embs", "models/embs/1M",
                     "The directory with the tracks embeddings.")
 flags.DEFINE_string("title_embs", None,
@@ -483,7 +483,7 @@ def do_rank(session, model, playlist, num_samples):
     playlist['items'] = samples
 
 
-def do_summed_rank(session, model, playlist, num_samples, memory=100):
+def do_summed_rank(session, model, playlist, num_samples, smooth=None):
 
     pid = int(playlist['pid']) + 1
     state = session.run(model.initial_state)
@@ -506,8 +506,14 @@ def do_summed_rank(session, model, playlist, num_samples, memory=100):
         if sum_logits is None:
             sum_logits = np.zeros(len(logits[0]))
 
-        if len(playlist['items']) - i <= memory:
+        if smooth is None:
             sum_logits += logits[0]
+        elif smooth == 'log':
+            sum_logits += logits[0] * np.log2(i + 2)
+        elif smooth == 'linear':
+            sum_logits += logits[0] * (i + 1)
+        else:
+            raise ValueError('Smooth can only be log or linear')
 
     sorted_items = np.argsort(sum_logits)[::-1]
     i = 0
@@ -645,6 +651,7 @@ def pretty_print(items, id2word):
             continue
     return ' '.join(uris)
 
+
 def get_config():
     if FLAGS.model == "small":
         return SmallConfig()
@@ -740,7 +747,7 @@ def main(_):
                         if FLAGS.strategy == "rank":
                             do_rank(session, mtest, playlist, 500)
                         elif FLAGS.strategy == "summed_rank":
-                            do_summed_rank(session, mtest, playlist, 500, memory=FLAGS.memory)
+                            do_summed_rank(session, mtest, playlist, 500, smooth=FLAGS.smooth)
                         elif FLAGS.strategy == "sample":
                             do_sample(session, mtest, playlist, 500)
                         else:
