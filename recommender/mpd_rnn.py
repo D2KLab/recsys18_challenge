@@ -112,7 +112,13 @@ def lyrics_emb(lyrics, data_index, track_id):
 
     try:
 
-        feature_vector = data_index.loc[track_id]['feature_vector']
+        if lyrics != "topics":
+
+            feature_vector = data_index.loc[track_id]['feature_vector']
+
+        else:
+
+            feature_vector = data_index[track_id]
 
         if lyrics == "style":
 
@@ -167,6 +173,10 @@ def lyrics_emb_len(lyrics):
 
         emb_len = 341
 
+    elif lyrics == "topics":
+
+        emb_len = 360
+
     else:
 
         raise ValueError("lyrics must be either style, emotion, grammatical, fuzzy or all")
@@ -185,13 +195,21 @@ def get_items_embeddings(vocab_size, dataset, lyrics):
 
     if lyrics:
 
-        data = pd.read_pickle('models/lyrics/spotify_uri_features.pickle')
+        if lyrics == 'topics':
+
+            data = pd.read_pickle('models/lyrics/mpd_uri_topics')
+
+            data_index = data
+
+        else:
+
+            data = pd.read_pickle('models/lyrics/spotify_uri_features.pickle')
+
+            data_index = data.set_index(['spotify_track_uri'])
 
         emb_len = lyrics_emb_len(lyrics)
 
         embeddings = np.zeros((vocab_size, emb_len), dtype=np.float32)
-
-        data_index = data.set_index(['spotify_track_uri'])
 
         for i in range(1, vocab_size):
             album_id = dataset.tracks_id2album[i]
