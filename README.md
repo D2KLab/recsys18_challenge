@@ -1,6 +1,10 @@
 # RecSys Challenge 2018
 Scripts for the RecSys Challenge 2018 from the D2KLab team.
 
+## Install Dependencies
+
+    pip install -r requirements.txt
+
 ## Dataset
 We converted the original JSON files in an equivalent CSV version.
 
