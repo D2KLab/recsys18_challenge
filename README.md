@@ -54,5 +54,5 @@ python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/p
 ## Ensemble
 
 ```
-python
+python recommender/ensemble.py
 ```
