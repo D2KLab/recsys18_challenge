@@ -53,7 +53,7 @@ python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/p
 
 ## Ensemble
 
-Put the submission files that you want to combine in a folder submissions/dry. Then run:
+Ensemble allows to combine predictions of a set of RNN configurations to increase the accuracy. To use it, you need to put the submission files inside a folder 'submissions/dry' and it will try all possible combinations of the submissions files and save them into files. 
 
 ```
 python recommender/ensemble.py
