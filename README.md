@@ -19,7 +19,11 @@ python evaluation/split.py --path dataset --input_playlists playlists_training_v
 
 ## Embeddings
 
+We rely on 2 set of embeddings that we use as input of a Neural Network.
+
 ### Word2Rec
+
+Embeddings representing the tracks/albums/artists based on their co-occurrence in playlists.
 
 ```
 python main.py word2rec_item word2rec.csv --w2r models/embs/1M/word2rec_dry.w2v --dataset dataset
@@ -29,20 +33,23 @@ python main.py word2rec_artist word2rec_artist.csv --w2r models/embs/1M/word2rec
 
 ### Title2Rec
 
+FastText embeddings representing the playlists' titles, computed on cluster of playlists based on the word2rec embeddings of their tracks.
+
 ```
 python main.py title2rec title2rec.csv
 python main.py title2rec_embs models/fast_text/title2rec.npy
 ```
 
-### Creative track
-mpd_uri_topics and spotify_uri_features.pickle are pickle files containing features extracted from song lyrics such as the dominant topics, the emotions, the style and so on. They can be used in the RNN by using the argument `--lyrics`.
+### Creative Track features
+
+`mpd_uri_topics` and `spotify_uri_features.pickle` are pickle files containing features extracted from song lyrics such as the dominant topics, the emotions, the style and so on. They can be used in the RNN by using the argument `--lyrics`.
 
 ## RNN
 
 ### Training
 
 ```
-python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/path/to/model/optimal --embs=models/embs/1M --title_embs=models/fast_text/title2rec.npy 
+python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/path/to/model/optimal --embs=models/embs/1M --title_embs=models/fast_text/title2rec.npy
 ```
 
 ### Generation
@@ -51,9 +58,11 @@ python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/p
 python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/path/to/model --embs=models/embs/1M --title_embs=models/fast_text/title2rec.npy --smooth=linear --sample_file=solution.csv --is_dry=False
 ```
 
+Add `--lyrics` in order to include the Creative Track features.
+
 ## Ensemble
 
-Ensemble allows to combine predictions of a set of RNN configurations to increase the accuracy. To use it, you need to put the submission files inside a folder 'submissions/dry' and it will try all possible combinations of the submissions files and save them into files. 
+Ensemble allows to combine predictions of a set of RNN configurations to increase the accuracy. To use it, you need to put the submission files inside a folder `submissions/dry` and it will try all possible combinations of the submissions files and save them into files.
 
 ```
 python recommender/ensemble.py
