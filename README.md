@@ -34,8 +34,8 @@ python main.py title2rec title2rec.csv
 python main.py title2rec_embs models/fast_text/title2rec.npy
 ```
 
-### Features
-mpd_uri_topics and spotify_uri_features.pickle
+### External Text Features
+mpd_uri_topics and spotify_uri_features.pickle are pickle files containing features extracted from song lyrics such as the dominant topics, the emotions, the style and so on. 
 
 ## RNN
 
