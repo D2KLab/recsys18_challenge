@@ -53,6 +53,8 @@ python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/p
 
 ## Ensemble
 
+Put the submission files that you want to combine in a folder submissions/dry. Then run:
+
 ```
 python recommender/ensemble.py
 ```
