@@ -1,76 +1,58 @@
 # RecSys Challenge 2018
-Scripts and data for the RecSys Challenge 2018.
+Scripts for the RecSys Challenge 2018 from the D2KLab team.
 
 ## Dataset
-[This directory](https://istitutoboella-my.sharepoint.com/:f:/g/personal/giuseppe_rizzo_ismb_it/EsATRk8BkslNm8J4XKMOTlYB_bAlNpZ4J5JY8phlL6gYQg?e=Fre1F7) contains a CSV version of the dataset released by Spotify for the RecSys Challenge 2018. We have divided the original MPD dataset in training, validation and test sets. The validation and test sets mirror the characteristics of the [challenge set](https://recsys-challenge.spotify.com/challenge_readme) provided by Spotify.
+We converted the original JSON files in an equivalent CSV version.
 
-| File                              | Description                                                      |
-| --------------------------------- | ---------------------------------------------------------------- |
-| tracks.csv                        | The tracks of the MPD as provided by Spotify                     |
-| playlists.csv                     | The playlists of the MPD as provided by Spotify                  |
-| items.csv                         | The items of the MPD as provided by Spotify                      |
-| playlists_challenge.csv           | The playlists of the challenge set as provided by Spotify        |
-| items_challenge.csv               | The items of the challenge set as provided by Spotify            |
+```
+python evaluation/mpd2csv.py --mpd_path /path/to/mpd --out_path dataset
+python evaluation/challenge2csv.py --challenge_path /path/to/challenge.json --out_path dataset
+```
 
-| File                              | Description                                                      |
-| --------------------------------- | ---------------------------------------------------------------- |
-| playlists_test.csv                | The playlists of the test set                                    |
-| playlists_test_pid.csv            | The ids of the playlists that are included in the test set       |
-| items_test.csv                    | The seed and hidden items of the test set                        |
-| items_test_x.csv                  | The seed items of the test set                                   |
-| items_test_y.csv                  | The hidden items of the test set                                 |
+We have divided the MPD dataset in training, validation and test sets. The validation and test sets mirror the characteristics of the challenge set.
 
-| File                              | Description                                                      |
-| --------------------------------- | ---------------------------------------------------------------- |
-| playlists_training_validation.csv | The playlists of the training and validation set                 |
-| items_training_validation.csv     | The items of the training and validation set                     |
+```
+python -u evaluation/split.py --path dataset --input_playlists playlists.csv --input_items items.csv --output_playlists playlists_training_validation.csv --output_items items_training_validation.csv --output_playlists_split playlists_test.csv --output_playlists_split_pid playlists_test_pid.csv --output_items_split items_test.csv --output_items_split_x items_test_x.csv --output_items_split_y items_test_y.csv --scale 1000
+python -u evaluation/split.py --path dataset --input_playlists playlists_training_validation.csv --input_items items_training_validation.csv --output_playlists playlists_training.csv --output_items items_training.csv --output_playlists_split playlists_validation.csv --output_playlists_split_pid playlists_validation_pid.csv --output_items_split items_validation.csv --output_items_split_x items_validation_x.csv --output_items_split_y items_validation_y.csv --scale 1000
+```
 
-| File                              | Description                                                      |
-| --------------------------------- | ---------------------------------------------------------------- |
-| playlists_validation.csv          | The playlists of the validation set                              |
-| playlists_validation_pid.csv      | The ids of the playlists that are included in the validation set |
-| items_validation.csv              | The seed and hidden items of the validation set                  |
-| items_validation_x.csv            | The seed items of the validation set                             |
-| items_validation_y.csv            | The hidden items of the validation set                           |
 
-| File                              | Description                                                      |
-| --------------------------------- | ---------------------------------------------------------------- |
-| playlists_training.csv            | The playlists of the training set                                |
-| items_training.csv                | The items of the training set                                    |
+## Embeddings
 
-### items.csv
+### Word2Rec
 
-* pid
-* pos
-* track_uri
+```
+python main.py word2rec_item word2rec.csv --w2r models/embs/1M/word2rec_dry.w2v --dataset dataset
+python main.py word2rec_album word2rec_album.csv --w2r models/embs/1M/word2rec_dry_albums.w2v --dataset dataset
+python main.py word2rec_artist word2rec_artist.csv --w2r models/embs/1M/word2rec_dry_artists.w2v --dataset dataset
+```
 
-### playlists_training.csv
+### Title2Rec
 
-* pid
-* name
-* collaborative
-* num_tracks
-* num_artists
-* num_albums
-* num_followers
-* num_edits
-* modified_at
-* duration_ms
+```
+python main.py title2rec title2rec.csv
+python main.py title2rec_embs models/fast_text/title2rec.npy
+```
 
-### playlists_challenge.csv
+### Features
+mpd_uri_topics and spotify_uri_features.pickle
 
-* pid
-* name
-* num_samples
-* num_holdouts
-* num_tracks
+## RNN
 
-###  tracks.csv
+### Training
 
-* track_uri
-* track_name
-* artist_uri
-* artist_name
-* album_uri
-* album_name
-* duration_ms
+```
+python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/path/to/model/optimal --embs=models/embs/1M --title_embs=models/fast_text/title2rec.npy 
+```
+
+### Generation
+
+```
+python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/path/to/model --embs=models/embs/1M --title_embs=models/fast_text/title2rec.npy --smooth=linear --sample_file=solution.csv --is_dry=False
+```
+
+## Ensemble
+
+```
+python
+```
