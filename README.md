@@ -9,11 +9,11 @@ python evaluation/mpd2csv.py --mpd_path /path/to/mpd --out_path dataset
 python evaluation/challenge2csv.py --challenge_path /path/to/challenge.json --out_path dataset
 ```
 
-We have divided the MPD dataset in training, validation and test sets. The validation and test sets mirror the characteristics of the challenge set.
+We have divided the MPD dataset in training, validation and test sets. The validation and test sets mirror the characteristics of the official challenge set.
 
 ```
-python -u evaluation/split.py --path dataset --input_playlists playlists.csv --input_items items.csv --output_playlists playlists_training_validation.csv --output_items items_training_validation.csv --output_playlists_split playlists_test.csv --output_playlists_split_pid playlists_test_pid.csv --output_items_split items_test.csv --output_items_split_x items_test_x.csv --output_items_split_y items_test_y.csv --scale 1000
-python -u evaluation/split.py --path dataset --input_playlists playlists_training_validation.csv --input_items items_training_validation.csv --output_playlists playlists_training.csv --output_items items_training.csv --output_playlists_split playlists_validation.csv --output_playlists_split_pid playlists_validation_pid.csv --output_items_split items_validation.csv --output_items_split_x items_validation_x.csv --output_items_split_y items_validation_y.csv --scale 1000
+python evaluation/split.py --path dataset --input_playlists playlists.csv --input_items items.csv --output_playlists playlists_training_validation.csv --output_items items_training_validation.csv --output_playlists_split playlists_test.csv --output_playlists_split_pid playlists_test_pid.csv --output_items_split items_test.csv --output_items_split_x items_test_x.csv --output_items_split_y items_test_y.csv --scale 1000
+python evaluation/split.py --path dataset --input_playlists playlists_training_validation.csv --input_items items_training_validation.csv --output_playlists playlists_training.csv --output_items items_training.csv --output_playlists_split playlists_validation.csv --output_playlists_split_pid playlists_validation_pid.csv --output_items_split items_validation.csv --output_items_split_x items_validation_x.csv --output_items_split_y items_validation_y.csv --scale 1000
 ```
 
 
@@ -35,7 +35,7 @@ python main.py title2rec_embs models/fast_text/title2rec.npy
 ```
 
 ### Creative track
-mpd_uri_topics and spotify_uri_features.pickle are pickle files containing features extracted from song lyrics such as the dominant topics, the emotions, the style and so on. They can be used in the RNN by using the argument --lyrics.
+mpd_uri_topics and spotify_uri_features.pickle are pickle files containing features extracted from song lyrics such as the dominant topics, the emotions, the style and so on. They can be used in the RNN by using the argument `--lyrics`.
 
 ## RNN
 
