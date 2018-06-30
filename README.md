@@ -42,7 +42,13 @@ python main.py title2rec_embs models/fast_text/title2rec.npy
 
 ### Creative Track features
 
-`mpd_uri_topics` and `spotify_uri_features.pickle` are pickle files containing features extracted from song lyrics such as the dominant topics, the emotions, the style and so on. They can be used in the RNN by using the argument `--lyrics`.
+`mpd_uri_topics` and `spotify_uri_features.pickle` are pickle files containing features extracted from song lyrics such as the dominant topics, the emotions, the style and so on.
+
+For use these features (only for _Creative Track_):
+- download the 2 files in this [folder](https://drive.google.com/drive/folders/1rrNwp1LIuXXyIr0P1xgT7DfyVqmuqGIz?usp=sharing);
+- unzip them in `<projectpath>\models\lyrics`.
+
+Then, they can be used in the RNN by using the argument `--lyrics`.
 
 ## RNN
 
