@@ -61,6 +61,7 @@ Add `--lyrics` in order to include the Creative Track features.
 ```
 python recommender/mpd_rnn.py --data_path=dataset --model=optimal --save_path=/path/to/model/optimal --embs=models/embs/1M --title_embs=models/fast_text/title2rec.npy
 ```
+The trained models that have been used for the submissions are available at: http://eventmedia.eurecom.fr/recsys2018/
 
 ### Generation
 
@@ -75,3 +76,24 @@ Ensemble allows to combine predictions of a set of RNN configurations to increas
 ```
 python recommender/ensemble.py
 ```
+
+For the main track the following configurations have been combined:
+
+rnn_1M_300_e1.csv
+rnn_1M_300_e2.csv
+rnn_1M_400_e1.csv
+rnn_1M_400_e2.csv
+rnn_1M_e1.csv
+rnn_1M_e2.csv
+
+For the creative track:
+
+rnn_1M_e2.csv
+rnn_1M_400_emotion_e2.csv
+rnn_1M_400_emotion_e1.csv
+rnn_1M_400_fuzzy_e1.csv
+rnn_1M_400_fuzzy_e2.csv
+rnn_1M_400_e1.csv
+rnn_1M_e1.csv
+rnn_1M_300_e1.csv
+rnn_1M_400_e2.csv
