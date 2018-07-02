@@ -77,8 +77,9 @@ Ensemble allows to combine predictions of a set of RNN configurations to increas
 python recommender/ensemble.py
 ```
 
-For the main track the following configurations have been combined:
+The following configurations have been combined, corresponding to the models of http://eventmedia.eurecom.fr/recsys2018/:
 
+Main:
 rnn_1M_300_e1.csv
 rnn_1M_300_e2.csv
 rnn_1M_400_e1.csv
@@ -86,7 +87,7 @@ rnn_1M_400_e2.csv
 rnn_1M_e1.csv
 rnn_1M_e2.csv
 
-For the creative track:
+Creative:
 
 rnn_1M_e2.csv
 rnn_1M_400_emotion_e2.csv
