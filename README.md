@@ -83,10 +83,13 @@ The naming has to be interpreted as:
 rnn_1M_d_creative_epoch.csv
 
 d = dimension of the embedding vector
+
 d = 300 when using track, album and artist embeddings from the word2vec model
+
 d = 300 + 100 = 400 when also using title2rec embedding vectors
 
 creative = emotion when using emotion detection features
+
 creative = fuzzy when using emotion, PoS tagging, and sentiment features
 
 Main:
