@@ -88,9 +88,11 @@ d = 300 when using track, album and artist embeddings from the word2vec model
 
 d = 300 + 100 = 400 when also using title2rec embedding vectors
 
-creative = emotion when using emotion detection features
+creative = 'emotion' when using emotion detection features
 
-creative = fuzzy when using emotion, PoS tagging, and sentiment features
+creative = 'fuzzy' when using emotion, PoS tagging, and sentiment features
+
+rnn_1M_epoch.csv correspond to the RNN using the SmallConfig rather than the OptimalConfig (see mpd_rnn.py for the detailed list of hyper-parameters)
 
 Main:
 * rnn_1M_300_e1.csv
