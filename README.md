@@ -78,21 +78,6 @@ python recommender/ensemble.py
 ```
 
 The following configurations have been combined, corresponding to the models of http://eventmedia.eurecom.fr/recsys2018/.
-The naming has to be interpreted as:
-
-rnn_1M_d_creative_epoch.csv
-
-d = dimension of the embedding vector
-
-d = 300 when using track, album and artist embeddings from the word2vec model
-
-d = 300 + 100 = 400 when also using title2rec embedding vectors
-
-creative = 'emotion' when using emotion detection features
-
-creative = 'fuzzy' when using emotion, PoS tagging, and sentiment features
-
-rnn_1M_epoch.csv correspond to the RNN using the SmallConfig rather than the OptimalConfig (see mpd_rnn.py for the detailed list of hyper-parameters)
 
 Main:
 * rnn_1M_300_e1.csv
@@ -112,3 +97,19 @@ Creative:
 * rnn_1M_400_e2.csv
 * rnn_1M_e1.csv
 * rnn_1M_e2.csv
+
+The naming has to be interpreted as:
+
+rnn_1M_d_creative_epoch.csv
+
+d = dimension of the embedding vector
+
+d = 300 when using track, album and artist embeddings from the word2vec model
+
+d = 300 + 100 = 400 when also using title2rec embedding vectors
+
+creative = 'emotion' when using emotion detection features
+
+creative = 'fuzzy' when using emotion, PoS tagging, and sentiment features
+
+rnn_1M_epoch.csv correspond to the RNN using the SmallConfig rather than the OptimalConfig (see mpd_rnn.py for the detailed list of hyper-parameters)
