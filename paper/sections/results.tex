@@ -1,0 +1,45 @@
+\section{Experimental Results}
+\label{sec:results}
+In order to evaluate the effectiveness of our approach, we have divided the official MPD dataset in a training, a validation, and a test set. The validation and the test set contain 10,000 playlists each, that is the 1\% of the original dataset. These playlists have been selected according to the characteristics of the MPD provided by Spotify.\footnote{\url{https://recsys-challenge.spotify.com/challenge_readme}} Thus, the validation and test playlists are divided into 10 different categories: each of them defines a peculiar way of hiding some information during the testing phase, i.e. the number of seed tracks or their order.
+
+Furthermore, we have implemented an evaluation tool that computes on our split the same metrics that are described in the challenge rules. Following this approach, it is possible to inspect the evaluation results for each category of the test set separately. As expected, the category containing playlists with only their title and no tracks proved to be the most difficult one to address.
+
+Table~\ref{tab:approaches} contains the results obtained on our test set by Title2Rec, Word2Rec, and the RNNs trained with different optimizers and input vectors. Word2Rec corresponds to the word2vec model trained on sequences of tracks as described in Section~\ref{sec:track_embs} and used to generate predictions directly by looking up the 500 most similar tracks to the seeds. All the neural models, but the first two, were trained with the optimal configuration described in Section~\ref{sec:rnn-opt}. These models are computationally demanding: the training phase lasted more than three days per epoch. The numbers 300 and 400 represent the dimensionality of the input vectors: the 300 models were trained without the title embeddings, while the 400 ones also exploit the fastText model described in Section~\ref{sec:title_embs}. All the RNNs that include the features extracted from the lyrics were trained with input vectors of dimensionality higher than 400.
+
+\begin{table}
+\begin{tabular}{@{}llllll@{}}
+\toprule
+Approach    & Optimizer & Epoch & R-Prec.     & NDCG   & Click   \\ \midrule
+Title2Rec   & -         & -     & 0.0837      & 0.1260 & 12.007  \\
+Word2Rec    & -         & -     & 0.0963      & 0.1444 & 8.4322  \\
+RNN 300     & Gradient  & 1     & 0.1417      & 0.1621 & 4.1902  \\
+RNN 300     & Gradient  & 2     & 0.1500      & 0.1656 & 3.9433  \\
+RNN 300     & ADAM      & 1     & 0.1557      & 0.1702 & 3.9213  \\
+RNN 300     & ADAM      & 2     & 0.1457      & 0.1672 & 4.4224  \\
+RNN 400     & ADAM      & 1     & 0.1572      & 0.1708 & 3.9340  \\
+RNN 400     & ADAM      & 2     & 0.1520      & 0.1694 & 4.1307  \\
+RNN Emotion & ADAM      & 1     & 0.1556      & 0.1702 & 4.0101  \\
+RNN Emotion & ADAM      & 2     & 0.1500      & 0.1680 & 4.3594  \\
+RNN All Lyrics   & ADAM      & 1     & 0.1555      & 0.1698 & 3.9950  \\
+RNN All Lyrics   & ADAM      & 2     & 0.1503      & 0.1683 & 4.3456  \\ \bottomrule
+\end{tabular}
+\caption{Results of different approaches on our test set}
+\label{tab:approaches}
+\end{table}
+
+Table~\ref{tab:ensemble} lists the results computed on our test set for the best performing configurations in the two tracks of the challenge. The models combined in the ensemble are the following:
+\begin{description}
+ \item[Main track] RNN 300 (Gradient; Epoch 1 and 2), RNN 300 (ADAM; Epoch 1 and 2), and RNN 400 (Epoch 1 and 2).
+ \item[Creative track] RNN 300 (Gradient; Epoch 1 and 2), RNN 300 (ADAM; Epoch 1), RNN 400 (Epoch 1 and 2), RNN Emotion (Epoch 1 and 2), and RNN All Lyrics (Epoch 1 and 2).
+\end{description}
+
+\begin{table}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Track    & R-Precision & NDCG   & Click  \\ \midrule
+Main     & 0.1611      & 0.1710 & 3.6349 \\
+Creative & 0.1634      & 0.1717 & 3.5964 \\ \bottomrule
+\end{tabular}
+\caption{Results of the ensemble on our test set}
+\label{tab:ensemble}
+\end{table}

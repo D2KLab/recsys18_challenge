@@ -1,0 +1,68 @@
+\section{Optimization}
+\label{sec:optimization}
+In the following sections, we describe the empirical evaluations conducted with the purpose of optimizing the configuration of the RNN, Title2Rec, and the ensemble.
+
+\subsection{RNN Optimization}
+\label{sec:rnn-opt}
+For optimizing the hyper-parameters of the RNN, we executed a grid search on a down-sampled version of the MPD dataset containing 100,000 playlists. We considered the following parameters:
+\begin{itemize}
+    \item optimizer: $opt = \{Gradient,\ RMSProp,\ ADAM\}$
+    \item learning rate: $lr = \{1,\ 0.5,\ 0.1,\ 0.01\}$
+    \item number of steps: $ns = \{10,\ 20\}$
+    \item hidden layer size: $hl = \{50,\ 100\}$ 
+\end{itemize}
+
+For each configuration $(opt,\ lr,\ ns,\ hl)$, we trained the RNN model and we measured its perplexity on a validation set consisting of 1,000 playlists. Furthermore, we measured its R-Precision, NDCG, and Click metrics as defined in the challenge rules on a separate test set of the same size. The validation and test sets used for optimization purposes contain playlists with the first 5 tracks available as the initial seed, while the others are hidden.
+
+We considered a total of 48 possible configurations: the values of perplexity of the most significant ones are reported in Table~\ref{tab:rnn_opt}. Perplexity measures the `surprise' of the probabilistic model in observing the data and it is defined as $s^{L}$ where $L$ is the cross-entropy loss function. Thus, lower values of perplexity corresponds to better models. We observe that, when the hidden size is fixed, the best performing optimizer is ADAM. Furthermore, increasing the number of steps reduces the perplexity of the RNN, but it does not have a significant effect on the R-Prec.
+
+Finally, because of time constrains, we selected the configuration $(ADAM,\ 1,\ 10,\ 50)$ as the optimal one, despite its higher perplexity: in fact, we empirically observed that a smaller hidden size results in a shorter training duration.
+
+\begin{table}
+\begin{tabular}{@{}lllllll@{}}
+\toprule
+Optimizer & L.R. & Steps & Hidden  & ppl     & Time & R-Prec. \\ \midrule
+ADAM      & 1    & 20    & 100     & 1357.04 & 3:29 & 0.1739  \\
+ADAM      & 1    & 10    & 100     & 1482.86 & 3:39 & 0.1742  \\
+Gradient  & 1    & 10    & 100     & 1693.96 & 3:32 & 0.1566  \\
+ADAM      & 1    & 10    & 50      & 1716.92 & 2:30 & 0.1745  \\
+Gradient  & 1    & 10    & 50      & 2005.54 & 2:25 & 0.1543  \\ \bottomrule
+\end{tabular}
+\caption{The results of the most significant RNN models. `L.R.' stands for learning rate, `Steps' for the number of time steps, `Hidden' for the size of the hidden layer, `ppl' stands for perplexity, `Time' is the training time in hours:minutes.}
+\label{tab:rnn_opt}
+\end{table}
+
+We evaluated in a controlled setting all the strategies for generating the recommended tracks described in Section~\ref{sec:generation}. We observed that, independently from other hyper-parameters, the technique called \textit{do\_summed\_rank} systematically achieved better results than the other ones in all the metrics considered. For this reason, we selected this algorithm as our track generation strategy.
+
+Finally, we analyzed the effects on the evaluation metrics of the different categories of features extracted from the lyrics as defined in Section~\ref{sec:lyrics}, and we selected the groups emotion and fuzzy as the most performing ones.
+
+\subsection{Title2Rec Optimization}
+In order to improve the performances of Title2Rec, we worked on different parts of the pipeline. Each optimization has been tested by running the algorithm on a validation set of 1,000 playlists. Then, only the edits that improved the scores with respect to the non-optimized version have been kept in the final version.
+
+We applied a pre-processing on each single title that performed a series of tasks:
+\begin{itemize}
+    \item lowercasing;
+    \item detecting and separating emoji from words;
+    \item separating the skin code from the emoji;
+    \item detecting and separating emoticons from words;
+    \item transforming space-separated single letters into words (e.g. ``\textit{w o r k o u t}'' becomes ``\textit{workout}'';
+    \item remove `\#' from hashtags.
+\end{itemize}
+
+Other tasks that have been tested with no improvements are:
+\begin{itemize}
+    \item detecting and separating punctuation from words;
+    \item removing stop words;
+    \item removing all spaces.
+\end{itemize}
+
+The latter point has been partially exploited because we noticed an improvement in the results by including in the corpus both versions of the title -- keeping the spaces (as in ``green day'') and removing them (``greenday'').
+
+Another optimization step included the usage of different parameters for executing the pipeline. The clustering phase have been tested with different values of $k$ (the number of clusters in output for the K-means algorithm). The value of 500 gives better results than smaller and bigger ones, which produce clusters that are respectively less specialized and less populated. The fastText training has been run with 5 epochs, a learning rate of 0.1 and different loss functions (ns, hs, \textit{softmax}), window sizes (3, \textit{5}, 10). The values in italics represent the best results.
+
+The ordering by popularity described in Section~\ref{sec:t2r} has been modified so that the impact of each playlist is proportional to the similarity of its title to the seed. In other words, a track has a higher chance to be recommended if it is included in a large number of playlists in $P$ and if most of them are among the top ones more similar to the seed.
+
+Finally, some improvements come from the inclusion of the playlist descriptions in the training. On the whole set of descriptions in the MPD dataset, we compute a TF-IDF model. Thanks to this, we are able to extract a set of keywords for each description by selecting the 3 words with the highest score. These keywords are added to the documents used to build the clusters. The contribution of the description is null when the playlist does not include any.
+
+\subsection{Ensemble Optimization}
+We studied the performance of the ensemble by applying a combination without repetition sampling of the different runs for each of the tracks, namely main and creative, and for different groups of runs. In detail, given $n$ the total number of runs, and $k$ the grouping factor, we devised a number of $\frac{n!}{k!(n-k!)}$, where we varied $k=1,\dots,n-1$. We then selected the best performing configuration for both the main and the creative tracks by optimizing the three metrics used for the final ranking. These configurations are reported in Section~\ref{sec:results}.
